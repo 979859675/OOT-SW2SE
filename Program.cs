@@ -147,7 +147,9 @@ internal sealed class EditorWindow : Form
     {
         try
         {
-            byte[] page = Program.ReadResource("editor.html.gz");
+            string version = typeof(Program).Assembly.GetName().Version.ToString(3);
+            string html = System.Text.Encoding.UTF8.GetString(Program.ReadResource("editor.html.gz"));
+            byte[] page = System.Text.Encoding.UTF8.GetBytes(html.Replace("{{EDITOR_VERSION}}", version));
             var environment = await CoreWebView2Environment.CreateAsync(
                 null, Path.Combine(Program.AppFolder, "BrowserProfile"));
             if (IsDisposed) return;
