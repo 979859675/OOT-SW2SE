@@ -1,6 +1,6 @@
 # OOT SW2SE
 
-Windows save editor for the Nintendo Switch 2 remake of The Legend of Zelda: Ocarina of Time.
+Save editor for the Nintendo Switch 2 remake of The Legend of Zelda: Ocarina of Time.
 
 ![OOT SW2SE showing the stats of a loaded save](editor-screenshot.jpg)
 
