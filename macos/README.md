@@ -17,6 +17,11 @@ macos/build.sh
 The app is written to `macos/dist/OOT SW2SE.app` (Apple silicon and Intel).
 The version shown in the editor is read from `Program.cs`.
 
+Ready-made builds come from GitHub Actions: download one from a *macOS
+build* run in the repository's Actions tab (needs a GitHub account) or from
+a release. They are ad-hoc signed like a local build, so the first launch
+needs **Open Anyway** (see [below](#running-it-on-another-mac)).
+
 ## Use
 
 1. Open the app and click **Open Backup**.
