@@ -86,4 +86,5 @@ $compilerArgs += Join-Path $source 'Program.cs'
 if ($LASTEXITCODE -ne 0) { throw "C# compilation failed with exit code $LASTEXITCODE." }
 
 Copy-Item -LiteralPath $license -Destination $dist -Force
+Copy-Item -LiteralPath (Join-Path $source 'LICENSE') -Destination (Join-Path $dist 'LICENSE.txt') -Force
 Write-Output $exe
