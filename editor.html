@@ -203,7 +203,7 @@ html.landing { overflow: hidden; }
   </section>
   <section id="inventory-section">
     <h2>Inventory</h2>
-    <p class="muted">Check a missing item to add one to the inventory. The editor sets its acquisition flags on export. Story events and equipment slots are tracked separately.</p>
+    <p class="muted">Check Add or Remove to change inventory. Removing an item keeps its acquisition history unless you also check Clear acquisition flags. This clears the catalog's mapped acquisition flags, not story events or quest progress. Equipped weapons and shields must be unequipped in both eras first. Default clothes cannot be removed here.</p>
     <p id="inventory-registration" class="muted" hidden></p>
     <div class="controls">
       <input id="item-filter" type="search" placeholder="Search inventory" aria-label="Search inventory">
@@ -212,11 +212,11 @@ html.landing { overflow: hidden; }
         <option value="owned">Already owned</option>
         <option value="all">All readable entries</option>
         <option value="masks">Masks</option>
-        <option value="changed">Marked for addition</option>
+        <option value="changed">Pending inventory changes</option>
       </select>
     </div>
     <p id="mask-menu-info" class="muted" hidden>The two amiibo masks share one equipment tile. The other eight masks share a second tile.</p>
-    <div class="scroll"><table><thead><tr><th>Item</th><th>Category</th><th>In Save</th><th>Add</th></tr></thead><tbody id="inventory"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Item</th><th>Category</th><th>In Save</th><th>Add</th><th>Remove</th><th>Clear acquisition flags</th></tr></thead><tbody id="inventory"></tbody></table></div>
   </section>
   <section id="flags-section">
     <h2>Progress Flags</h2>
@@ -244,6 +244,7 @@ html.landing { overflow: hidden; }
     <h2>Save Patch</h2>
     <div class="controls">
       <button id="export" class="primary" type="submit" form="edit">Save Patch ZIP</button>
+      <button id="export-folder" type="submit" form="edit">Export to Folder</button>
       <button id="reset" type="button">Reset All Edits</button>
       <span id="pending" class="muted" aria-live="polite"></span>
     </div>
@@ -306,19 +307,28 @@ const desktop = (() => {
     });
   }
 
-  async function savePatch(name, blob) {
-    const bytes = new Uint8Array(await blob.arrayBuffer());
+  function base64(bytes) {
     let binary = '';
     for (let i = 0; i < bytes.length; i += 8192)
       binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-    return send('savePatch', { name, contents: btoa(binary) });
+    return btoa(binary);
+  }
+
+  async function savePatch(name, blob) {
+    return send('savePatch', { name, contents: base64(new Uint8Array(await blob.arrayBuffer())) });
+  }
+
+  function saveFolder(name, entries) {
+    return send('saveFolder', { name, files: entries.map(([path, bytes]) => ({
+      relativePath: path, contents: base64(typeof bytes === 'string' ? utf8.encode(bytes) : bytes),
+    })) });
   }
 
   function setWorkspaceLoaded(loaded) {
     host.postMessage({ action: 'workspace', loaded });
   }
 
-  return { openBackup, savePatch, setWorkspaceLoaded };
+  return { openBackup, savePatch, saveFolder, setWorkspaceLoaded };
 })();
 
 const HEX = (n, width = 8) => '0x' + n.toString(16).toUpperCase().padStart(width, '0');
@@ -541,6 +551,55 @@ function registerInventory(save, registrations, manualFlags) {
   }
 }
 
+const equippedItemFields = [0xA95A3521, 0xEE463235, 0xA1F7EE2B, 0x2342B619];
+
+function removalIssue(save, hash, editCatalog) {
+  if (!editCatalog.removable.has(hash) || !save.fields.has(hash) || save.int(hash) !== 1) {
+    return 'Only supported, owned single items can be removed here.';
+  }
+  const name = editCatalog.items.get(hash);
+  // Do not guess the game's empty equipment value or silently change equipment.
+  for (const field of equippedItemFields) {
+    if (!save.fields.has(field)) return 'The equipment fields could not be checked.';
+    if (save.string(field, 64) === name) return 'Unequip this item in both eras before removing it.';
+  }
+  return '';
+}
+
+function acquisitionFlags(save, hash, registrations) {
+  const entries = registrations.filter(([stocks]) => stocks.includes(hash));
+  const hashes = [...new Set(entries.flatMap(([, acquired, related]) => [acquired, related].filter(Boolean)))];
+  if (!hashes.length || hashes.some(h => !save.fields.has(h) || ![0, 1].includes(save.int(h)))) {
+    throw Error('The acquisition flags cannot be safely edited for ' + HEX(hash));
+  }
+  return hashes;
+}
+
+function removeInventory(slot, save, changes, editCatalog) {
+  const removals = new Set(changes.removals ?? []);
+  const clears = new Set(changes.clearAcquisitions ?? []);
+  const additions = new Set(changes.additions);
+  const manual = new Map(changes.flags);
+  for (const hash of removals) {
+    const issue = removalIssue(slot.p, hash, editCatalog);
+    if (issue) throw Error(issue + ' ' + editCatalog.items.get(hash));
+    if (additions.has(hash)) throw Error('An item cannot be added and removed in the same patch.');
+    save.view.setInt32(save.at(hash), 0, true);
+  }
+  const resetFlags = new Set();
+  for (const hash of clears) {
+    if (!removals.has(hash)) throw Error('Clearing acquisition flags requires removing the item.');
+    for (const flag of acquisitionFlags(save, hash, editCatalog.registrations)) resetFlags.add(flag);
+  }
+  for (const flag of resetFlags) {
+    if (manual.get(flag) === true) throw Error('A Progress flag conflicts with clearing acquisition flags: ' + HEX(flag));
+    const stillOwned = editCatalog.registrations.some(([stocks, acquired, related]) =>
+      (acquired === flag || related === flag) && stocks.some(h => save.fields.has(h) && save.int(h) > 0));
+    if (stillOwned) throw Error('An acquisition flag is shared with an item still in inventory: ' + HEX(flag));
+    save.view.setInt32(save.at(flag), 0, true);
+  }
+}
+
 function writeVitals(slot, p, c, vitals) {
   const { maxHearts, hearts, maxMagic, magic } = vitals;
   if (!Number.isInteger(maxHearts) || maxHearts < 3 || maxHearts > 20) {
@@ -612,6 +671,7 @@ function updateSlot(slot, changes, editCatalog) {
     }
     set(p, hash, 1);
   }
+  removeInventory(slot, p, changes, editCatalog);
   registerInventory(p, editCatalog.registrations, changes.flags);
   for (const [hash, checked] of changes.flags) {
     const before = slot.p.u32(slot.p.at(hash));
@@ -627,6 +687,9 @@ function updateSlot(slot, changes, editCatalog) {
 function editOptions(catalog) {
   return {
     addable: new Set(catalog.inventory.filter(item => item[3]).map(item => item[0])),
+    removable: new Set(catalog.inventory.filter(item => item[3] &&
+      !['Armor_Adult_Normal', 'Obj_Armor_Child_Normal'].includes(item[1])).map(item => item[0])),
+    items: new Map(catalog.inventory.map(([hash, name]) => [hash, name])),
     flags: new Set(catalog.fields.filter(([, type, name]) => name && catalog.types[type] === 'Bool').map(item => item[0])),
     registrations: catalog.registrations,
   };
@@ -820,6 +883,8 @@ function initialize() {
   const catalog = JSON.parse(get('catalog').textContent);
   const editable = editOptions(catalog);
   const inventoryAdditions = new Set();
+  const inventoryRemovals = new Set();
+  const clearAcquisitions = new Set();
   const flagChanges = new Map();
   const amountInputs = new Map();
   const capacityInputs = new Map();
@@ -915,7 +980,8 @@ function initialize() {
     return input;
   }
   function showPending() {
-    get('pending').textContent = inventoryAdditions.size + " items to add · " + flagChanges.size + " flag changes";
+    get('pending').textContent = inventoryAdditions.size + " to add · " + inventoryRemovals.size +
+      " to remove · " + clearAcquisitions.size + " acquisition resets · " + flagChanges.size + " flag changes";
     result.textContent = '';
   }
   function updateLimits() {
@@ -964,6 +1030,8 @@ function initialize() {
     if (options) voiceSelect.value = String(options.language);
     get('bottle-info').textContent = owned.length ? "In save: " + owned.join(', ') : "In save: 0 bottles";
     inventoryAdditions.clear();
+    inventoryRemovals.clear();
+    clearAcquisitions.clear();
     flagChanges.clear();
     flagPage = 0;
     updateLimits();
@@ -980,23 +1048,51 @@ function initialize() {
     const rows = catalog.inventory.flatMap(([hash, name, category, canAdd, title]) => {
       if (!state.p.fields.has(hash) || ![name, category, title].join(' ').toLowerCase().includes(search)) return [];
       const count = state.p.int(hash);
-      const pending = inventoryAdditions.has(hash);
+      const adding = inventoryAdditions.has(hash);
+      const removing = inventoryRemovals.has(hash);
+      const pending = adding || removing;
       const available = canAdd && count === 0;
       if ((filter === 'missing' && !available) || (filter === 'owned' && count === 0) ||
           (filter === 'masks' && !name.startsWith('Armor_Child_Mask_')) ||
           (filter === 'changed' && !pending)) return [];
-      const toggle = available ? checkbox((title || name) + " — add", pending, checked => {
+      const toggle = available ? checkbox((title || name) + " — add", adding, checked => {
         if (checked) inventoryAdditions.add(hash);
         else inventoryAdditions.delete(hash);
         showPending();
         if (filter === 'changed' && !checked) inventory();
       }) : '—';
+      const issue = removalIssue(state.p, hash, editable);
+      let remove = '—';
+      let clear = '—';
+      if (canAdd && count === 1) {
+        remove = checkbox((title || name) + " — remove", removing, checked => {
+          if (checked) inventoryRemovals.add(hash);
+          else {
+            inventoryRemovals.delete(hash);
+            clearAcquisitions.delete(hash);
+          }
+          showPending();
+          inventory();
+        });
+        remove.disabled = Boolean(issue);
+        remove.title = issue || 'Remove this item from inventory';
+        clear = checkbox((title || name) + " — clear acquisition flags", clearAcquisitions.has(hash), checked => {
+          if (checked) clearAcquisitions.add(hash);
+          else clearAcquisitions.delete(hash);
+          showPending();
+        });
+        let flagIssue = '';
+        try { acquisitionFlags(state.p, hash, editable.registrations); }
+        catch (error) { flagIssue = error.message; }
+        clear.disabled = !removing || Boolean(issue || flagIssue);
+        clear.title = flagIssue || 'Select Remove first. Clears mapped acquisition flags; quest progress stays unchanged.';
+      }
       const label = document.createElement('div');
       if (title) label.append(element('strong', title), element('br', ''));
       label.append(element('code', name));
-      return [[label, category || '—', count, toggle]];
+      return [[label, category || '—', count, toggle, remove, clear]];
     });
-    tableRows('inventory', rows.length ? rows : [["No matches", '—', '—', '—']]);
+    tableRows('inventory', rows.length ? rows : [["No matches", '—', '—', '—', '—', '—']]);
   }
   function flags() {
     const search = get('flag-filter').value.trim().toLowerCase();
@@ -1091,8 +1187,8 @@ function initialize() {
     get('voice-controls').hidden = !options;
     voiceSelect.disabled = !options;
     get('patch-info').textContent = active.loose
-      ? "Copy the files from the ZIP into the destination save folder."
-      : "Copy the replacement files to the same paths in a copy of your full backup.";
+      ? "Copy the exported replacement files into a copy of your save folder. Folder export creates a new patch folder in your chosen location."
+      : "Copy the replacement files to the same paths in a copy of your full backup. Folder export creates a new patch folder in your chosen location; it contains only the edited files, not a full backup.";
     get('main').hidden = false;
     document.documentElement.classList.remove('landing');
     desktop.setWorkspaceLoaded(true);
@@ -1207,7 +1303,10 @@ function initialize() {
   get('edit').addEventListener('submit', async event => {
     event.preventDefault();
     const button = get('export');
+    const folderButton = get('export-folder');
+    const toFolder = event.submitter === folderButton;
     button.disabled = true;
+    folderButton.disabled = true;
     result.textContent = '';
     const current = revision;
     try {
@@ -1218,7 +1317,7 @@ function initialize() {
           magic: get('magic').valueAsNumber, maxMagic: Number(maxMagicSelect.value),
         },
         amounts: inputAmounts(), upgrades: inputUpgrades(), bottles: get('bottles').valueAsNumber,
-        additions: inventoryAdditions, flags: flagChanges,
+        additions: inventoryAdditions, removals: inventoryRemovals, clearAcquisitions, flags: flagChanges,
       };
       const after = updateSlot(state, changes, editable);
       const edits = slotEdits(active, state, after);
@@ -1237,12 +1336,15 @@ function initialize() {
       }
       if (current !== revision) return;
       const name = 'Ocarina-of-Time-' + (active.loose ? 'Save' : active.id) + '-Patch.zip';
-      const saved = await desktop.savePatch(name, zip(entries));
+      const saved = toFolder
+        ? await desktop.saveFolder(name.slice(0, -4), entries)
+        : await desktop.savePatch(name, zip(entries));
       if (current === revision) result.textContent = saved ? message + ' ' + saved : "Save canceled.";
     } catch (error) {
       if (current === revision) result.textContent = error.message;
     } finally {
       button.disabled = false;
+      folderButton.disabled = false;
     }
   });
 }

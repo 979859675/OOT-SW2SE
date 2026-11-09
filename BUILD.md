@@ -25,3 +25,11 @@ The script builds a universal app for Apple silicon and Intel, signs it ad hoc f
 GitHub Actions also runs this script ([`.github/workflows/macos.yml`](.github/workflows/macos.yml)): download the app from a run in the Actions tab, or from a release, where it is attached as `OOT-SW2SE-<version>-macOS.zip`. These builds are ad hoc signed, not notarized, so macOS blocks the first launch until you choose **Open Anyway** in System Settings → Privacy & Security.
 
 `macos/OOTSW2SE.swift` contains the native window and file dialogs. See [`macos/README.md`](macos/README.md) for usage notes and for running the app on another Mac.
+
+## Checks
+
+Run `node --test tests/editor.test.cjs` for synthetic save regression tests.
+On a Mac with Swift and Mono installed, run `python3 tests/host_exports.py` to
+compile and exercise the actual Swift and C# folder export helpers, including
+path validation and byte-for-byte output checks. These checks do not replace
+in-game testing with a real save.

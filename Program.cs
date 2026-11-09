@@ -15,8 +15,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: AssemblyTitle("OOT SW2SE")]
 [assembly: AssemblyDescription("Offline save editor for the Nintendo Switch 2 remake")]
 [assembly: AssemblyProduct("OOT SW2SE")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyFileVersion("1.0.1.0")]
 
 internal static class Program
 {
@@ -230,6 +230,9 @@ internal sealed class EditorWindow : Form
                 case "savePatch":
                     result = await SavePatch(request);
                     break;
+                case "saveFolder":
+                    result = await SaveFolder(request);
+                    break;
                 default:
                     throw new InvalidOperationException("Unknown editor action.");
             }
@@ -351,6 +354,14 @@ internal sealed class EditorWindow : Form
         }
     }
 
+    private async Task<object> SaveFolder(Request request)
+    {
+        var files = PatchFolderWriter.Decode(request.files);
+        string folder = FolderPicker.Select(Handle, lastFolder, "Select where to create the patch folder");
+        if (folder == null) return null;
+        return await Task.Run(() => PatchFolderWriter.Write(folder, files));
+    }
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
@@ -363,13 +374,68 @@ internal sealed class EditorWindow : Form
         public string action { get; set; }
         public string name { get; set; }
         public string contents { get; set; }
+        public PatchFolderWriter.Entry[] files { get; set; }
         public bool loaded { get; set; }
+    }
+}
+
+internal static class PatchFolderWriter
+{
+    public sealed class Entry
+    {
+        public string relativePath { get; set; }
+        public string contents { get; set; }
+    }
+
+    internal static Dictionary<string, byte[]> Decode(Entry[] entries)
+    {
+        if (entries == null || entries.Length < 2 || entries.Length > 4)
+            throw new IOException("Invalid patch file list.");
+        var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        int total = 0;
+        foreach (var entry in entries)
+        {
+            if (entry == null || entry.relativePath == null || !System.Text.RegularExpressions.Regex.IsMatch(
+                entry.relativePath, @"\A(?:progress\.sav|caption\.sav|option\.sav|manifest\.json|files/option\.sav|files/slot_0[0-5]/(?:progress|caption)\.sav)\z") ||
+                files.ContainsKey(entry.relativePath) || string.IsNullOrEmpty(entry.contents) || entry.contents.Length > 4 * 1024 * 1024)
+                throw new IOException("Invalid patch file.");
+            byte[] bytes = Convert.FromBase64String(entry.contents);
+            total += bytes.Length;
+            if (bytes.Length > 2 * 1024 * 1024 || total > 8 * 1024 * 1024)
+                throw new IOException("The patch files are too large.");
+            files.Add(entry.relativePath, bytes);
+        }
+        return files;
+    }
+
+    internal static string Write(string parent, Dictionary<string, byte[]> files)
+    {
+        string token = Guid.NewGuid().ToString("N");
+        string staging = Path.Combine(parent, ".oot-patch-" + token);
+        string destination = Path.Combine(parent, "Ocarina-of-Time-Patch-" + token);
+        Directory.CreateDirectory(staging);
+        try
+        {
+            foreach (var file in files)
+            {
+                string path = Path.Combine(staging, file.Key.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    stream.Write(file.Value, 0, file.Value.Length);
+            }
+            Directory.Move(staging, destination);
+            return destination;
+        }
+        finally
+        {
+            if (Directory.Exists(staging)) Directory.Delete(staging, true);
+        }
     }
 }
 
 internal static class FolderPicker
 {
-    internal static string Select(IntPtr owner, string initial)
+    internal static string Select(IntPtr owner, string initial, string title = "Select a backup or save folder")
     {
         var dialog = (IFileDialog)new FileOpenDialog();
         try
@@ -377,7 +443,7 @@ internal static class FolderPicker
             uint options;
             dialog.GetOptions(out options);
             dialog.SetOptions(options | 0x20 | 0x40 | 0x800);
-            dialog.SetTitle("Select a backup or save folder");
+            dialog.SetTitle(title);
             dialog.SetOkButtonLabel("Select Folder");
             if (Directory.Exists(initial))
             {
