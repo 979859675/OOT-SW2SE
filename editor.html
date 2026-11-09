@@ -799,6 +799,14 @@ function slotEdits(active, slot, after) {
   return paths.map((path, i) => ({ path, before: [slot.p.bytes, slot.c.bytes][i], after: after[i] }));
 }
 
+function exportLayout(active, edits, date = new Date(), uuid = globalThis.crypto.randomUUID()) {
+  const timestamp = date.toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '_');
+  return {
+    name: 'Ocarina-of-Time-' + (active.loose ? 'Save' : active.id) + '-Patch-' + timestamp + '_' + uuid,
+    entries: edits.map(({ path, after }) => [timestamp + '/' + path, after]),
+  };
+}
+
 function captionImage(save) {
   const offset = save.block(0x63696A32, 4);
   const size = save.u32(offset);
@@ -1187,8 +1195,8 @@ function initialize() {
     get('voice-controls').hidden = !options;
     voiceSelect.disabled = !options;
     get('patch-info').textContent = active.loose
-      ? "Copy the exported replacement files into a copy of your save folder. Folder export creates a new patch folder in your chosen location."
-      : "Copy the replacement files to the same paths in a copy of your full backup. Folder export creates a new patch folder in your chosen location; it contains only the edited files, not a full backup.";
+      ? "Copy the files inside the UTC timestamp folder into a copy of your save folder. Exports contain replacement files, not a full backup."
+      : "Copy the contents of the UTC timestamp folder into the files folder of a copy of your full backup. Copy manifest.json to the backup root when included. Exports contain replacement files, not a full backup.";
     get('main').hidden = false;
     document.documentElement.classList.remove('landing');
     desktop.setWorkspaceLoaded(true);
@@ -1325,7 +1333,7 @@ function initialize() {
       if (options && language !== options.language) {
         edits.push({ path: 'option.sav', before: options.save.bytes, after: updateOptions(options, language) });
       }
-      const entries = edits.map(({ path, after }) => [(active.loose ? '' : 'files/') + path, after]);
+      const { name, entries } = exportLayout(active, edits);
       let message = "Patch for " + active.id + " saved.";
       if (manifestSource) {
         try {
@@ -1335,10 +1343,9 @@ function initialize() {
         }
       }
       if (current !== revision) return;
-      const name = 'Ocarina-of-Time-' + (active.loose ? 'Save' : active.id) + '-Patch.zip';
       const saved = toFolder
-        ? await desktop.saveFolder(name.slice(0, -4), entries)
-        : await desktop.savePatch(name, zip(entries));
+        ? await desktop.saveFolder(name, entries)
+        : await desktop.savePatch(name + '.zip', zip(entries));
       if (current === revision) result.textContent = saved ? message + ' ' + saved : "Save canceled.";
     } catch (error) {
       if (current === revision) result.textContent = error.message;

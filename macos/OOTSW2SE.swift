@@ -336,9 +336,18 @@ final class EditorWebView: WKWebView {
 // MARK: - Folder export
 
 enum PatchFolderWriter {
-    static func decode(_ entries: [[String: String]]?) throws -> [String: Data] {
+    static func timestamp(_ name: String) throws -> String {
+        let pattern = #"\AOcarina-of-Time-(?:Save|slot_0[0-5])-Patch-([0-9]{8}_[0-9]{6})_[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\z"#
+        let regex = try NSRegularExpression(pattern: pattern)
+        guard let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+              let range = Range(match.range(at: 1), in: name) else { throw HostError("Invalid patch folder name.") }
+        return String(name[range])
+    }
+
+    static func decode(_ entries: [[String: String]]?, name: String) throws -> [String: Data] {
+        let stamp = try timestamp(name)
         guard let entries, (2...4).contains(entries.count) else { throw HostError("Invalid patch file list.") }
-        let pattern = #"\A(?:progress\.sav|caption\.sav|option\.sav|manifest\.json|files/option\.sav|files/slot_0[0-5]/(?:progress|caption)\.sav)\z"#
+        let pattern = #"\A(?:manifest\.json|"# + stamp + #"/(?:progress\.sav|caption\.sav|option\.sav|slot_0[0-5]/(?:progress|caption)\.sav))\z"#
         var files: [String: Data] = [:]
         var total = 0
         for entry in entries {
@@ -357,11 +366,12 @@ enum PatchFolderWriter {
         return files
     }
 
-    static func write(parent: URL, files: [String: Data]) throws -> URL {
+    static func write(parent: URL, files: [String: Data], name: String) throws -> URL {
+        _ = try timestamp(name)
         let fm = FileManager.default
         let token = UUID().uuidString
         let staging = parent.appendingPathComponent(".oot-patch-" + token, isDirectory: true)
-        let destination = parent.appendingPathComponent("Ocarina-of-Time-Patch-" + token, isDirectory: true)
+        let destination = parent.appendingPathComponent(name, isDirectory: true)
         try fm.createDirectory(at: staging, withIntermediateDirectories: false)
         defer { try? fm.removeItem(at: staging) }
         for (path, bytes) in files {
@@ -542,7 +552,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
         case "openBackup":
             openBackup(completion: finish)
         case "saveFolder":
-            saveFolder(entries: request["files"] as? [[String: String]], completion: finish)
+            saveFolder(entries: request["files"] as? [[String: String]], name: request["name"] as? String, completion: finish)
         case "savePatch":
             savePatch(name: request["name"] as? String, contents: request["contents"] as? String, completion: finish)
         default:
@@ -635,9 +645,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
         }
     }
 
-    private func saveFolder(entries: [[String: String]]?, completion: @escaping Completion) {
+    private func saveFolder(entries: [[String: String]]?, name: String?, completion: @escaping Completion) {
+        guard let name else { return completion(nil, HostError("Invalid patch folder name.")) }
         let files: [String: Data]
-        do { files = try PatchFolderWriter.decode(entries) }
+        do { files = try PatchFolderWriter.decode(entries, name: name) }
         catch { return completion(nil, error) }
         let panel = NSOpenPanel()
         panel.message = "Select where to create the patch folder"
@@ -653,7 +664,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
             guard response == .OK, let folder = panel.url else { return completion(nil, nil) }
             Task {
                 let outcome = await Task.detached(priority: .userInitiated) {
-                    Result { try PatchFolderWriter.write(parent: folder, files: files) }
+                    Result { try PatchFolderWriter.write(parent: folder, files: files, name: name) }
                 }.value
                 switch outcome {
                 case .success(let url): completion(url.path, nil)

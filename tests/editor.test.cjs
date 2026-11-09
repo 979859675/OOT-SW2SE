@@ -4,10 +4,10 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync(require('node:path').join(__dirname, '../editor.html'), 'utf8');
 const catalog = JSON.parse(html.match(/<script id="catalog" type="application\/json">(.*?)<\/script>/s)[1]);
-const context = vm.createContext({ TextEncoder, TextDecoder, Blob,
+const context = vm.createContext({ TextEncoder, TextDecoder, Blob, crypto: require('node:crypto').webcrypto,
   window: { chrome: { webview: { addEventListener() {}, postMessage() {} } } } });
 vm.runInContext(html.match(/<script>\s*('use strict';.*?)<\/script>/s)[1], context);
-const api = vm.runInContext('({readSlot, updateSlot, editOptions, removalIssue, acquisitionFlags, zip})', context);
+const api = vm.runInContext('({readSlot, updateSlot, editOptions, removalIssue, acquisitionFlags, zip, exportLayout})', context);
 const editable = api.editOptions(catalog);
 const item = name => catalog.inventory.find(row => row[1] === name)[0];
 const registration = hash => catalog.registrations.find(([stocks]) => stocks.includes(hash));
@@ -117,6 +117,32 @@ test('reject unsupported stocks, non-boolean acquisition flags and shared flags 
   const g = fixture(['Item_Boomerang', 'Item_Hammer']); const slot = g.slot();
   const shared = { ...editable, registrations: [...catalog.registrations, [[item('Item_Hammer')], flag, 0, 'Shared test']] };
   assert.throws(() => api.updateSlot(slot, changes(slot, {removals:[h], clearAcquisitions:[h]}), shared), /shared/);
+});
+
+test('ZIP and folder layout use one UTC timestamp before the UUID and instead of files', async () => {
+  const uuid = '12345678-1234-4234-8234-123456789abc';
+  const date = new Date('2026-11-09T17:42:16+08:00');
+  const generated = api.exportLayout({id:'slot_00'}, [], date);
+  assert.match(generated.name, /Patch-20261109_094216_[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+  for (const active of [{ id: 'slot_00' }, { id: 'loose', loose: true }]) {
+    const prefix = active.loose ? '' : 'slot_00/';
+    const edits = ['progress.sav', 'caption.sav', 'option.sav'].map(path => ({path: path === 'option.sav' ? path : prefix + path, after: new Uint8Array([1,2,3])}));
+    const layout = api.exportLayout(active, edits, date, uuid);
+    assert.equal(layout.name, `Ocarina-of-Time-${active.loose ? 'Save' : 'slot_00'}-Patch-20261109_094216_${uuid}`);
+    layout.entries.push(['manifest.json', '{}']);
+    const expected = edits.map(({path}) => '20261109_094216/' + path).concat('manifest.json');
+    assert.deepEqual(Array.from(layout.entries, ([path]) => path), expected);
+    const bytes = Buffer.from(await api.zip(layout.entries).arrayBuffer());
+    const names = [];
+    for (let offset = 0; bytes.readUInt32LE(offset) === 0x04034b50;) {
+      const size = bytes.readUInt32LE(offset + 18);
+      const length = bytes.readUInt16LE(offset + 26);
+      const extra = bytes.readUInt16LE(offset + 28);
+      names.push(bytes.toString('utf8', offset + 30, offset + 30 + length));
+      offset += 30 + length + extra + size;
+    }
+    assert.deepEqual(names, expected);
+  }
 });
 
 module.exports = { fixture };

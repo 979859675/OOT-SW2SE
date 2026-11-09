@@ -15,8 +15,8 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: AssemblyTitle("OOT SW2SE")]
 [assembly: AssemblyDescription("Offline save editor for the Nintendo Switch 2 remake")]
 [assembly: AssemblyProduct("OOT SW2SE")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.0.2.0")]
+[assembly: AssemblyFileVersion("1.0.2.0")]
 
 internal static class Program
 {
@@ -356,10 +356,10 @@ internal sealed class EditorWindow : Form
 
     private async Task<object> SaveFolder(Request request)
     {
-        var files = PatchFolderWriter.Decode(request.files);
+        var files = PatchFolderWriter.Decode(request.files, request.name);
         string folder = FolderPicker.Select(Handle, lastFolder, "Select where to create the patch folder");
         if (folder == null) return null;
-        return await Task.Run(() => PatchFolderWriter.Write(folder, files));
+        return await Task.Run(() => PatchFolderWriter.Write(folder, files, request.name));
     }
 
     [DllImport("dwmapi.dll")]
@@ -387,8 +387,17 @@ internal static class PatchFolderWriter
         public string contents { get; set; }
     }
 
-    internal static Dictionary<string, byte[]> Decode(Entry[] entries)
+    internal static string Timestamp(string name)
     {
+        var match = System.Text.RegularExpressions.Regex.Match(name ?? "",
+            @"\AOcarina-of-Time-(?:Save|slot_0[0-5])-Patch-([0-9]{8}_[0-9]{6})_[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\z");
+        if (!match.Success) throw new IOException("Invalid patch folder name.");
+        return match.Groups[1].Value;
+    }
+
+    internal static Dictionary<string, byte[]> Decode(Entry[] entries, string name)
+    {
+        string timestamp = Timestamp(name);
         if (entries == null || entries.Length < 2 || entries.Length > 4)
             throw new IOException("Invalid patch file list.");
         var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
@@ -396,7 +405,7 @@ internal static class PatchFolderWriter
         foreach (var entry in entries)
         {
             if (entry == null || entry.relativePath == null || !System.Text.RegularExpressions.Regex.IsMatch(
-                entry.relativePath, @"\A(?:progress\.sav|caption\.sav|option\.sav|manifest\.json|files/option\.sav|files/slot_0[0-5]/(?:progress|caption)\.sav)\z") ||
+                entry.relativePath, @"\A(?:manifest\.json|" + timestamp + @"/(?:progress\.sav|caption\.sav|option\.sav|slot_0[0-5]/(?:progress|caption)\.sav))\z") ||
                 files.ContainsKey(entry.relativePath) || string.IsNullOrEmpty(entry.contents) || entry.contents.Length > 4 * 1024 * 1024)
                 throw new IOException("Invalid patch file.");
             byte[] bytes = Convert.FromBase64String(entry.contents);
@@ -408,11 +417,12 @@ internal static class PatchFolderWriter
         return files;
     }
 
-    internal static string Write(string parent, Dictionary<string, byte[]> files)
+    internal static string Write(string parent, Dictionary<string, byte[]> files, string name)
     {
+        Timestamp(name);
         string token = Guid.NewGuid().ToString("N");
         string staging = Path.Combine(parent, ".oot-patch-" + token);
-        string destination = Path.Combine(parent, "Ocarina-of-Time-Patch-" + token);
+        string destination = Path.Combine(parent, name);
         Directory.CreateDirectory(staging);
         try
         {

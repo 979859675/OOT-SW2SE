@@ -31,9 +31,13 @@ needs **Open Anyway** (see [below](#running-it-on-another-mac)).
    - a single `slot_0X` folder,
    - any folder that holds `progress.sav` and `caption.sav`.
 3. Edit, then choose **Save Patch ZIP** or **Export to Folder**. Folder export
-   creates a new `Ocarina-of-Time-Patch-…` folder in your selected location.
-   Copy the replacement files over a **copy** of your saves, keeping the relative
-   paths. The patch contains only edited files, not a complete backup.
+   creates a new `Ocarina-of-Time-…-Patch-<UTC timestamp>_<uuid>` folder in your
+   selected location; ZIP exports use the same name with `.zip` appended.
+   Both contain a UTC timestamp folder such as `20261109_094216/` instead of
+   `files/`. Copy that folder's contents into the `files/` directory of a **copy**
+   of your full backup; copy `manifest.json` to the backup root when included.
+   For a standalone save, copy the files inside the timestamp folder into the
+   save folder. The patch contains only edited files, not a complete backup.
 
 In Inventory → **Already owned**, check **Remove** for a supported single item.
 Optionally check **Clear acquisition flags** to clear the catalog's mapped flags
