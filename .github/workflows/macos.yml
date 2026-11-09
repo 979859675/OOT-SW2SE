@@ -1,0 +1,98 @@
+# macos.yml
+#
+# Builds the native macOS app with macos/build.sh on a GitHub-hosted Mac and
+# publishes it as OOT-SW2SE-<version>-macOS.zip: as a workflow artifact on
+# every run (download it from the run's page in the Actions tab) and as an
+# asset of each published GitHub release, next to the Windows zip. The
+# Windows build (build.ps1) is not part of this workflow.
+#
+# The app is ad-hoc signed, not notarized, so macOS asks for "Open Anyway"
+# in System Settings > Privacy & Security on first launch (macos/README.md).
+
+name: macOS build
+
+on:
+  push:
+    branches: [main]
+    # Only the files that go into the app or produce it; edits elsewhere
+    # (README, Windows-only files) leave the app unchanged.
+    paths:
+      - "macos/**"
+      - "editor.html"
+      - "editor.ico"
+      - "Program.cs"
+      - "LICENSE"
+      - ".github/workflows/macos.yml"
+  pull_request:
+    paths:
+      - "macos/**"
+      - "editor.html"
+      - "editor.ico"
+      - "Program.cs"
+      - "LICENSE"
+      - ".github/workflows/macos.yml"
+  # Fires when a release is published (also when a draft is published), so
+  # the release already exists when the zip is attached to it.
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Pinned rather than macos-latest, so the toolchain changes only on
+    # purpose: Xcode 26 builds both halves of the universal app (Apple
+    # silicon and Intel), while macOS 27 dropped Intel Macs and later Xcode
+    # releases may stop building for them. Move up when GitHub retires it.
+    runs-on: macos-26
+    timeout-minutes: 20
+    permissions:
+      # Write access is used only by the release step to attach the zip.
+      # The token is not saved in the checkout (persist-credentials: false),
+      # so build.sh never sees it, and pull requests from forks always get
+      # a read-only token whatever is asked here.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Print the toolchain first so a failing build log shows which Xcode
+      # and Swift compiled it.
+      - name: Build the app
+        run: |
+          xcodebuild -version
+          swiftc --version
+          macos/build.sh
+
+      - name: Zip the app
+        id: zip
+        run: |
+          app="macos/dist/OOT SW2SE.app"
+          # build.sh writes the version from Program.cs into Info.plist;
+          # read it back so the zip is named like the Windows release zip.
+          version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Contents/Info.plist")"
+          zip="macos/dist/OOT-SW2SE-$version-macOS.zip"
+          # ditto keeps the bundle's symlinks, permissions and code signature,
+          # which a plain zip (or upload-artifact's own zipping) would lose.
+          ditto -c -k --keepParent "$app" "$zip"
+          echo "path=$zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the zip as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.zip.outputs.path }}
+          # Upload the zip as it is instead of wrapping it in a second zip;
+          # the artifact is then named after the file.
+          archive: false
+          if-no-files-found: error
+          # Lets a re-run replace the zip uploaded by an earlier attempt.
+          overwrite: true
+
+      - name: Attach the zip to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          ZIP: ${{ steps.zip.outputs.path }}
+        # --clobber replaces the asset when the run is re-run.
+        run: gh release upload "$TAG" "$ZIP" --clobber --repo "$GITHUB_REPOSITORY"

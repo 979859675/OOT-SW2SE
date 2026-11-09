@@ -22,4 +22,6 @@ macos/build.sh
 
 The script builds a universal app for Apple silicon and Intel, signs it ad hoc for the Mac that built it, and places it in `macos/dist/OOT SW2SE.app` with the project license inside the app. It bundles the same `editor.html` unchanged and reads the version from `Program.cs`.
 
+GitHub Actions also runs this script ([`.github/workflows/macos.yml`](.github/workflows/macos.yml)): download the app from a run in the Actions tab, or from a release, where it is attached as `OOT-SW2SE-<version>-macOS.zip`. These builds are ad hoc signed, not notarized, so macOS blocks the first launch until you choose **Open Anyway** in System Settings → Privacy & Security.
+
 `macos/OOTSW2SE.swift` contains the native window and file dialogs. See [`macos/README.md`](macos/README.md) for usage notes and for running the app on another Mac.
