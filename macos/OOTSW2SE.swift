@@ -333,6 +333,57 @@ final class EditorWebView: WKWebView {
     }
 }
 
+// MARK: - Folder export
+
+enum PatchFolderWriter {
+    static func timestamp(_ name: String) throws -> String {
+        let pattern = #"\AOcarina-of-Time-(?:Save|slot_0[0-5])-Patch-([0-9]{8}_[0-9]{6})_[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\z"#
+        let regex = try NSRegularExpression(pattern: pattern)
+        guard let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
+              let range = Range(match.range(at: 1), in: name) else { throw HostError("Invalid patch folder name.") }
+        return String(name[range])
+    }
+
+    static func decode(_ entries: [[String: String]]?, name: String) throws -> [String: Data] {
+        let stamp = try timestamp(name)
+        guard let entries, (2...4).contains(entries.count) else { throw HostError("Invalid patch file list.") }
+        let pattern = #"\A(?:manifest\.json|"# + stamp + #"/(?:progress\.sav|caption\.sav|option\.sav|slot_0[0-5]/(?:progress|caption)\.sav))\z"#
+        var files: [String: Data] = [:]
+        var total = 0
+        for entry in entries {
+            guard let path = entry["relativePath"], path.range(of: pattern, options: .regularExpression) != nil,
+                  files[path] == nil, let contents = entry["contents"], !contents.isEmpty,
+                  contents.utf8.count <= HostLimits.maxFileBytes * 2,
+                  let bytes = Data(base64Encoded: contents), !bytes.isEmpty else {
+                throw HostError("Invalid patch file.")
+            }
+            total += bytes.count
+            guard bytes.count <= HostLimits.maxFileBytes, total <= HostLimits.maxBackupBytes else {
+                throw HostError("The patch files are too large.")
+            }
+            files[path] = bytes
+        }
+        return files
+    }
+
+    static func write(parent: URL, files: [String: Data], name: String) throws -> URL {
+        _ = try timestamp(name)
+        let fm = FileManager.default
+        let token = UUID().uuidString
+        let staging = parent.appendingPathComponent(".oot-patch-" + token, isDirectory: true)
+        let destination = parent.appendingPathComponent(name, isDirectory: true)
+        try fm.createDirectory(at: staging, withIntermediateDirectories: false)
+        defer { try? fm.removeItem(at: staging) }
+        for (path, bytes) in files {
+            let target = staging.appendingPathComponent(path)
+            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try bytes.write(to: target, options: .withoutOverwriting)
+        }
+        try fm.moveItem(at: staging, to: destination)
+        return destination
+    }
+}
+
 // MARK: - Editor window
 
 /// Callback that finishes one bridge request on the main actor: a result
@@ -500,6 +551,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
         switch action {
         case "openBackup":
             openBackup(completion: finish)
+        case "saveFolder":
+            saveFolder(entries: request["files"] as? [[String: String]], name: request["name"] as? String, completion: finish)
         case "savePatch":
             savePatch(name: request["name"] as? String, contents: request["contents"] as? String, completion: finish)
         default:
@@ -586,6 +639,35 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
                 }.value
                 switch outcome {
                 case .success: completion(url.lastPathComponent, nil)
+                case .failure(let error): completion(nil, error)
+                }
+            }
+        }
+    }
+
+    private func saveFolder(entries: [[String: String]]?, name: String?, completion: @escaping Completion) {
+        guard let name else { return completion(nil, HostError("Invalid patch folder name.")) }
+        let files: [String: Data]
+        do { files = try PatchFolderWriter.decode(entries, name: name) }
+        catch { return completion(nil, error) }
+        let panel = NSOpenPanel()
+        panel.message = "Select where to create the patch folder"
+        panel.prompt = "Export Here"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = lastFolder?.deletingLastPathComponent()
+        activePanel = panel
+        panel.begin { [weak self] response in
+            self?.activePanel = nil
+            guard response == .OK, let folder = panel.url else { return completion(nil, nil) }
+            Task {
+                let outcome = await Task.detached(priority: .userInitiated) {
+                    Result { try PatchFolderWriter.write(parent: folder, files: files, name: name) }
+                }.value
+                switch outcome {
+                case .success(let url): completion(url.path, nil)
                 case .failure(let error): completion(nil, error)
                 }
             }

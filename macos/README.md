@@ -30,8 +30,20 @@ needs **Open Anyway** (see [below](#running-it-on-another-mac)).
    - the `files` folder of a backup,
    - a single `slot_0X` folder,
    - any folder that holds `progress.sav` and `caption.sav`.
-3. Edit, then **Save Patch ZIP** and copy the files from the ZIP over a
-   **copy** of your saves.
+3. Edit, then choose **Save Patch ZIP** or **Export to Folder**. Folder export
+   creates a new `Ocarina-of-Time-…-Patch-<UTC timestamp>_<uuid>` folder in your
+   selected location; ZIP exports use the same name with `.zip` appended.
+   Both contain a UTC timestamp folder such as `20261109_094216/` instead of
+   `files/`. Copy that folder's contents into the `files/` directory of a **copy**
+   of your full backup; copy `manifest.json` to the backup root when included.
+   For a standalone save, copy the files inside the timestamp folder into the
+   save folder. The patch contains only edited files, not a complete backup.
+
+In Inventory → **Already owned**, check **Remove** for a supported single item.
+Optionally check **Clear acquisition flags** to clear the catalog's mapped flags
+along with the item. Leaving it unchecked preserves acquisition history. Story
+events and quest progress are not reset. Weapons and shields equipped in either
+era must be unequipped in the game first; default clothes cannot be removed here.
 
 Close the game or emulator first: a save file that changes while it is
 being read is refused. Files stored in iCloud must be downloaded first.

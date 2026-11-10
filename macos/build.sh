@@ -40,6 +40,7 @@ mkdir -p "$staged/Contents/MacOS" "$staged/Contents/Resources"
 # Swift 6 mode turns data-race warnings into errors, so they can't creep in.
 for arch in arm64 x86_64; do
   swiftc -O -swift-version 6 \
+    -module-cache-path "$build/ModuleCache" \
     -target "$arch-apple-macos$min_macos" \
     -o "$build/OOTSW2SE-$arch" \
     "$here/OOTSW2SE.swift"
