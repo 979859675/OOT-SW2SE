@@ -1,0 +1,1 @@
+{"name":"oot-sw2se-website","private":true,"version":"1.0.0","scripts":{"start":"node server.cjs","test":"node --test test.cjs"},"engines":{"node":">=22"}}
