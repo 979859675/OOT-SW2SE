@@ -25,7 +25,7 @@ for(const id of ids){
  // All templates include only trusted HTML, no raw PHP processing instructions.
  html=html.replace(/href=(["'])favicon.png\1/g,`href=$1assets/games/${id}/favicon.png$1`).replace(/src=(["'])favicon.png\1/g,`src=$1assets/games/${id}/favicon.png$1`);
  if(!/zelda-/.test(id))html=html.replace('</head>','<link rel="stylesheet" href="assets/games/common.css"></head>');
- html=html.replace(/<\?/g,'&lt;?').replace('</head>','<link rel="stylesheet" href="assets/games-shell.css"><script src="assets/multi-game.js" defer></script></head>');
+ html=html.replace(/<\?/g,'&lt;?').replace('</head>','<link rel="stylesheet" href="assets/games-shell.css?v=20261113-contrast"><script src="assets/multi-game.js" defer></script></head>');
  fs.writeFileSync(path.join(target,'private/views',id+'.php'),"<?php if (!defined('OOT_APP')) { http_response_code(404); exit; } ?>\n"+html);
  const dest=path.join(target,'assets/games',id);fs.mkdirSync(dest,{recursive:true});
  const walk=(dir,rel='')=>{for(const ent of fs.readdirSync(dir,{withFileTypes:true})){const r=path.join(rel,ent.name),full=path.join(dir,ent.name);if(ent.isDirectory())walk(full,r);else if(/\.(png|jpe?g|webp|svg|css)$/i.test(ent.name)){

@@ -1,2 +1,69 @@
 #php-shell{max-width:1100px;margin:20px auto;padding:18px;border:1px solid #ad9569;border-radius:10px;background:#172b20;color:#f4e6bf;font:15px/1.6 system-ui,"Microsoft YaHei",sans-serif}#php-shell a{color:#e7cb7b}#php-shell .php-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap}#php-shell p{margin:8px 0}#php-status{white-space:pre-wrap;color:#ffe399}#php-shell button,#php-shell select,#php-shell input{font:inherit;max-width:100%}#php-shell input[type=file]{display:block!important}#php-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:15px auto;max-width:1100px}#php-tabs button.active{outline:2px solid #dbc57e}.php-page{padding-bottom:30px}.php-page h3{margin-top:24px}.php-page input,.php-page select{max-width:100%;box-sizing:border-box}.php-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.php-fields label{display:block}.php-fields label>input,.php-fields label>select{display:block;width:100%;margin-top:6px}.php-row{display:grid!important;grid-template-columns:64px minmax(160px,1fr) minmax(200px,2fr);gap:16px;align-items:center;padding:14px!important;border-bottom:1px solid #7775;margin:8px 0}.php-row>img{width:64px;height:64px;object-fit:contain}.php-row .php-properties{display:flex;gap:10px;flex-wrap:wrap}.php-properties label{font-size:12px;max-width:170px}.php-properties input,.php-properties select{display:block;width:100%}.php-row small{display:block;word-break:break-all}.php-row.php-removed{opacity:.35}.php-pagination{display:flex;gap:12px;align-items:center;margin:16px 0}.php-page button{cursor:pointer}.php-search{margin:12px 0;width:100%;padding:10px}#the-editor.php-active{display:block!important}.php-warning{padding:12px;border-left:3px solid #d6b878;background:#917e3022;margin:12px 0}dialog.php-dialog{max-width:min(900px,95vw);max-height:90vh;overflow:auto;background:#172b20;color:#f4e6bf;border:1px solid #c7ad69;padding:24px}dialog.php-dialog::backdrop{background:#0009}[hidden]{display:none!important}@media(max-width:650px){.php-row{grid-template-columns:48px 1fr}.php-row .php-properties{grid-column:1/-1}.php-fields{grid-template-columns:1fr 1fr}#php-shell{margin:10px}}
 #the-editor[hidden]{display:none!important}
+
+/* Explicit foreground/background pairs: never inherit pale text onto native white controls. */
+:is(#php-shell,#php-tabs,#the-editor,dialog.php-dialog) :is(input,select,textarea,button){
+  color-scheme:dark;
+  color:#f5f7f2!important;
+  -webkit-text-fill-color:#f5f7f2!important;
+  background-color:#14291f!important;
+  background-image:none!important;
+  border:1px solid #81998a!important;
+  border-radius:5px;
+  font-family:system-ui,"Microsoft YaHei",sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  opacity:1;
+}
+:is(#php-shell,#the-editor,dialog.php-dialog) :is(input:not([type=checkbox]):not([type=radio]),select,textarea){
+  min-height:38px;
+  padding:7px 10px;
+  box-sizing:border-box;
+}
+:is(#php-shell,#php-tabs,#the-editor,dialog.php-dialog) button{
+  padding:7px 12px;
+  min-height:38px;
+  cursor:pointer;
+}
+:is(#php-shell,#php-tabs,#the-editor,dialog.php-dialog) :is(button,select):hover:not(:disabled){
+  background-color:#254735!important;
+  border-color:#e2c67d!important;
+}
+:is(#php-shell,#php-tabs,#the-editor,dialog.php-dialog) :is(input,select,textarea,button):focus-visible{
+  outline:3px solid #f1ce75!important;
+  outline-offset:3px;
+  border-color:#f1ce75!important;
+}
+:is(#php-shell,#the-editor,dialog.php-dialog) :is(input,textarea)::placeholder{
+  color:#b7c5bd!important;
+  -webkit-text-fill-color:#b7c5bd!important;
+  opacity:1;
+}
+:is(#php-shell,#the-editor,dialog.php-dialog) :is(select option,select optgroup){
+  color:#f5f7f2!important;
+  background:#14291f!important;
+}
+:is(#php-shell,#the-editor,dialog.php-dialog) :is(input,select,textarea,button):disabled{
+  color:#c0cac3!important;
+  -webkit-text-fill-color:#c0cac3!important;
+  background-color:#2c3630!important;
+  border-color:#68766d!important;
+  opacity:1!important;
+  cursor:not-allowed;
+}
+#php-tabs button.active{
+  color:#18251c!important;
+  -webkit-text-fill-color:#18251c!important;
+  background-color:#e5c986!important;
+  border-color:#ffe6a8!important;
+  font-weight:700;
+}
+.php-properties label,dialog.php-dialog label{color:#f5f7f2}
+.php-row small{color:inherit;opacity:1}
+.php-row.php-removed{opacity:1;background-color:#343434!important}
+.php-row.php-removed>div:first-of-type{text-decoration:line-through}
+:is(#php-shell,#the-editor,dialog.php-dialog) input:is([type=checkbox],[type=radio]){accent-color:#e5c986}
+#php-shell input[type=file]::file-selector-button{
+  background:#e5c986;color:#18251c;border:1px solid #e5c986;
+  border-radius:4px;padding:6px 10px;margin-right:10px;cursor:pointer;
+}

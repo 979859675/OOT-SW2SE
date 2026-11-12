@@ -46,7 +46,7 @@
 .fficon.fficon23{background-position: 0px -368px}
 .fficon.fficon24{background-position: 0px -384px}
 	--></style>
-<link rel="stylesheet" href="assets/games/common.css"><link rel="stylesheet" href="assets/games-shell.css"><script src="assets/multi-game.js" defer></script></head>
+<link rel="stylesheet" href="assets/games/common.css"><link rel="stylesheet" href="assets/games-shell.css?v=20261113-contrast"><script src="assets/multi-game.js" defer></script></head>
 <body>
 
 <!-- HEADER -->
