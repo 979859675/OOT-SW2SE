@@ -40,6 +40,15 @@ jobs:
         run: php 网站/tests/php-core.php .build/php-vectors.json .build/php-test.zip
       - name: Test PHP HTTP endpoints
         run: node 网站/tests/php-http.cjs
+      - name: Test multi-game PHP adapters
+        run: php 网站/tests/games.php
+      - name: Test multi-game HTTP endpoints
+        run: |
+          php -S 127.0.0.1:8124 -t 网站/PHP版 > /tmp/games-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:8124/games-api.php?action=config" && break; sleep 1; done
+          PHP_TEST_URL=http://127.0.0.1:8124 node 网站/tests/games-http.cjs
       - name: Package standalone PHP website
         if: matrix.php == '8.2'
         run: cd 网站/PHP版 && zip -r ../../.build/OOT-SW2SE-PHP.zip .
