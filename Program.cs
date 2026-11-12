@@ -13,7 +13,7 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("OOT SW2SE")]
-[assembly: AssemblyDescription("Offline save editor for the Nintendo Switch 2 remake")]
+[assembly: AssemblyDescription("Nintendo Switch 2 重制版离线存档编辑器")]
 [assembly: AssemblyProduct("OOT SW2SE")]
 [assembly: AssemblyVersion("1.0.2.0")]
 [assembly: AssemblyFileVersion("1.0.2.0")]
@@ -86,7 +86,7 @@ internal static class Program
             }
         }
         if (LoadLibraryEx(file, IntPtr.Zero, 0x1100) == IntPtr.Zero)
-            throw new InvalidOperationException("The Microsoft WebView2 loader could not start.");
+            throw new InvalidOperationException("无法启动 Microsoft WebView2 加载器。");
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -179,14 +179,14 @@ internal sealed class EditorWindow : Form
         }
         catch (WebView2RuntimeNotFoundException)
         {
-            MessageBox.Show(this, "The Microsoft Edge WebView2 Runtime is required to run this app.",
+            MessageBox.Show(this, "运行此应用需要 Microsoft Edge WebView2 运行时。",
                 Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
         catch (Exception error)
         {
             if (IsDisposed) return;
-            MessageBox.Show(this, "The editor window could not start.\n\n" +
+            MessageBox.Show(this, "无法启动编辑器窗口。\n\n" +
                 error.GetBaseException().Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
@@ -212,7 +212,7 @@ internal sealed class EditorWindow : Form
         if (request.id < 1) return;
         if (dialogOpen)
         {
-            Reply(request.id, null, "A file dialog is already open.");
+            Reply(request.id, null, "已有文件对话框处于打开状态。");
             return;
         }
 
@@ -234,7 +234,7 @@ internal sealed class EditorWindow : Form
                     result = await SaveFolder(request);
                     break;
                 default:
-                    throw new InvalidOperationException("Unknown editor action.");
+                    throw new InvalidOperationException("未知的编辑器操作。");
             }
             Reply(request.id, result, null);
         }
@@ -275,7 +275,7 @@ internal sealed class EditorWindow : Form
             string slotFolder = Path.Combine(parent, slot);
             if (HasSavePair(slotFolder)) ReadPair(files, slotFolder, prefix + slot + "/", ref bytes);
         }
-        if (files.Count == 0) throw new IOException("No folder containing progress.sav and caption.sav was found.");
+        if (files.Count == 0) throw new IOException("未找到同时包含 progress.sav 和 caption.sav 的文件夹。");
         string option = Path.Combine(parent, "option.sav");
         string manifest = Path.Combine(folder, "manifest.json");
         if (File.Exists(option)) ReadFile(files, option, prefix + "option.sav", ref bytes);
@@ -301,13 +301,13 @@ internal sealed class EditorWindow : Form
         {
             long size = stream.Length;
             if (size > MaxFileBytes || size > MaxBackupBytes - bytes)
-                throw new IOException("The backup files exceed the expected size.");
+                throw new IOException("备份文件超出预期大小。");
             var contents = new byte[(int)size];
             int offset = 0;
             while (offset < contents.Length)
             {
                 int read = stream.Read(contents, offset, contents.Length - offset);
-                if (read == 0) throw new EndOfStreamException("A backup file was truncated while reading it.");
+                if (read == 0) throw new EndOfStreamException("读取过程中备份文件被截断。");
                 offset += read;
             }
             bytes += contents.Length;
@@ -318,15 +318,15 @@ internal sealed class EditorWindow : Form
     private async Task<object> SavePatch(Request request)
     {
         if (string.IsNullOrEmpty(request.contents) || request.contents.Length > MaxBackupBytes * 2)
-            throw new IOException("The patch ZIP is empty or too large.");
+            throw new IOException("ZIP 补丁为空或过大。");
         byte[] bytes = Convert.FromBase64String(request.contents);
         if (bytes.Length < 22 || bytes.Length > MaxBackupBytes ||
             bytes[0] != 0x50 || bytes[1] != 0x4B || bytes[2] != 3 || bytes[3] != 4)
-            throw new IOException("The editor did not create a valid patch ZIP.");
+            throw new IOException("编辑器未生成有效的 ZIP 补丁。");
         using (var dialog = new SaveFileDialog())
         {
-            dialog.Title = "Save patch";
-            dialog.Filter = "ZIP archive (*.zip)|*.zip";
+            dialog.Title = "保存补丁";
+            dialog.Filter = "ZIP 压缩包 (*.zip)|*.zip";
             dialog.DefaultExt = "zip";
             dialog.AddExtension = true;
             dialog.OverwritePrompt = true;
@@ -357,7 +357,7 @@ internal sealed class EditorWindow : Form
     private async Task<object> SaveFolder(Request request)
     {
         var files = PatchFolderWriter.Decode(request.files, request.name);
-        string folder = FolderPicker.Select(Handle, lastFolder, "Select where to create the patch folder");
+        string folder = FolderPicker.Select(Handle, lastFolder, "选择创建补丁文件夹的位置");
         if (folder == null) return null;
         return await Task.Run(() => PatchFolderWriter.Write(folder, files, request.name));
     }
@@ -391,7 +391,7 @@ internal static class PatchFolderWriter
     {
         var match = System.Text.RegularExpressions.Regex.Match(name ?? "",
             @"\AOcarina-of-Time-(?:Save|slot_0[0-5])-Patch-([0-9]{8}_[0-9]{6})_[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\z");
-        if (!match.Success) throw new IOException("Invalid patch folder name.");
+        if (!match.Success) throw new IOException("补丁文件夹名称无效。");
         return match.Groups[1].Value;
     }
 
@@ -399,7 +399,7 @@ internal static class PatchFolderWriter
     {
         string timestamp = Timestamp(name);
         if (entries == null || entries.Length < 2 || entries.Length > 4)
-            throw new IOException("Invalid patch file list.");
+            throw new IOException("补丁文件列表无效。");
         var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         int total = 0;
         foreach (var entry in entries)
@@ -407,11 +407,11 @@ internal static class PatchFolderWriter
             if (entry == null || entry.relativePath == null || !System.Text.RegularExpressions.Regex.IsMatch(
                 entry.relativePath, @"\A(?:manifest\.json|" + timestamp + @"/(?:progress\.sav|caption\.sav|option\.sav|slot_0[0-5]/(?:progress|caption)\.sav))\z") ||
                 files.ContainsKey(entry.relativePath) || string.IsNullOrEmpty(entry.contents) || entry.contents.Length > 4 * 1024 * 1024)
-                throw new IOException("Invalid patch file.");
+                throw new IOException("补丁文件无效。");
             byte[] bytes = Convert.FromBase64String(entry.contents);
             total += bytes.Length;
             if (bytes.Length > 2 * 1024 * 1024 || total > 8 * 1024 * 1024)
-                throw new IOException("The patch files are too large.");
+                throw new IOException("补丁文件过大。");
             files.Add(entry.relativePath, bytes);
         }
         return files;
@@ -445,7 +445,7 @@ internal static class PatchFolderWriter
 
 internal static class FolderPicker
 {
-    internal static string Select(IntPtr owner, string initial, string title = "Select a backup or save folder")
+    internal static string Select(IntPtr owner, string initial, string title = "选择备份或存档文件夹")
     {
         var dialog = (IFileDialog)new FileOpenDialog();
         try
@@ -454,7 +454,7 @@ internal static class FolderPicker
             dialog.GetOptions(out options);
             dialog.SetOptions(options | 0x20 | 0x40 | 0x800);
             dialog.SetTitle(title);
-            dialog.SetOkButtonLabel("Select Folder");
+            dialog.SetOkButtonLabel("选择文件夹");
             if (Directory.Exists(initial))
             {
                 IShellItem item;

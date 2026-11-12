@@ -1,65 +1,40 @@
-# OOT SW2SE for macOS
+# OOT SW2SE macOS 版
 
-A native macOS window for the OOT SW2SE save editor. It loads the same
-[`editor.html`](../editor.html) as the Windows version, unchanged, so the
-editor itself behaves identically; only the window, the folder picker and the
-save dialog are macOS code ([`OOTSW2SE.swift`](OOTSW2SE.swift)).
+OOT SW2SE 存档编辑器的原生 macOS 窗口。它与 Windows 版加载相同的 [`editor.html`](../editor.html)，编辑器行为保持一致；只有窗口、文件夹选择器和保存对话框使用 macOS 原生代码（[`OOTSW2SE.swift`](OOTSW2SE.swift)）。
 
-## Build
+## 构建
 
-Requires macOS 13 or later and the Xcode command-line tools
-(`xcode-select --install`). From the repository folder:
+需要 macOS 13 或更新版本及 Xcode 命令行工具（`xcode-select --install`）。在仓库目录运行：
 
 ```sh
 macos/build.sh
 ```
 
-The app is written to `macos/dist/OOT SW2SE.app` (Apple silicon and Intel).
-The version shown in the editor is read from `Program.cs`.
+应用输出到 `macos/dist/OOT SW2SE.app`，支持 Apple silicon 和 Intel。编辑器显示的版本号读取自 `Program.cs`。
 
-Ready-made builds come from GitHub Actions: download one from a *macOS
-build* run in the repository's Actions tab (needs a GitHub account) or from
-a release. They are ad-hoc signed like a local build, so the first launch
-needs **Open Anyway** (see [below](#running-it-on-another-mac)).
+可从仓库 Actions 页的 *macOS build* 构建记录下载成品（需要登录账号），或从发行版下载。成品与本地构建一样使用临时签名，首次启动需要允许“仍要打开”（见下文）。
 
-## Use
+## 使用
 
-1. Open the app and click **Open Backup**.
-2. Pick one of:
-   - a backup folder (with `files/slot_00` … or `slot_00` … inside),
-   - the `files` folder of a backup,
-   - a single `slot_0X` folder,
-   - any folder that holds `progress.sav` and `caption.sav`.
-3. Edit, then choose **Save Patch ZIP** or **Export to Folder**. Folder export
-   creates a new `Ocarina-of-Time-…-Patch-<UTC timestamp>_<uuid>` folder in your
-   selected location; ZIP exports use the same name with `.zip` appended.
-   Both contain a UTC timestamp folder such as `20261109_094216/` instead of
-   `files/`. Copy that folder's contents into the `files/` directory of a **copy**
-   of your full backup; copy `manifest.json` to the backup root when included.
-   For a standalone save, copy the files inside the timestamp folder into the
-   save folder. The patch contains only edited files, not a complete backup.
+1. 打开应用，点击 **打开备份**。
+2. 可选择：
+   - 包含 `files/slot_00` 等目录或直接包含 `slot_00` 等目录的备份文件夹；
+   - 备份的 `files` 文件夹；
+   - 单个 `slot_0X` 文件夹；
+   - 同时包含 `progress.sav` 和 `caption.sav` 的任意文件夹。
+3. 编辑后点击 **保存 ZIP 补丁** 或 **导出到文件夹**。文件夹导出会在所选位置新建 `Ocarina-of-Time-…-Patch-<UTC 时间戳>_<uuid>` 文件夹，ZIP 导出使用相同名称并添加 `.zip` 后缀。
+4. 两种导出均使用如 `20261109_094216/` 的 UTC 时间戳目录，而非 `files/`。将该目录内的内容复制到完整备份**副本**的 `files/` 目录；如包含 `manifest.json`，将其复制到备份根目录。独立存档则将时间戳目录内的文件复制到存档文件夹。补丁仅包含编辑后的文件，并非完整备份。
 
-In Inventory → **Already owned**, check **Remove** for a supported single item.
-Optionally check **Clear acquisition flags** to clear the catalog's mapped flags
-along with the item. Leaving it unchecked preserves acquisition history. Story
-events and quest progress are not reset. Weapons and shields equipped in either
-era must be unequipped in the game first; default clothes cannot be removed here.
+在“物品栏 → 已持有”中，勾选受支持单件物品的 **移除**。可同时勾选 **清除获取标记**，以清除目录中对应的标记；不勾选则保留获取记录。剧情事件和任务进度不会重置。请先在游戏中于少年和成年两个时期卸下已装备的武器和盾牌；默认服装不能在此移除。
 
-Close the game or emulator first: a save file that changes while it is
-being read is refused. Files stored in iCloud must be downloaded first.
+请先关闭游戏或模拟器：若存档在读取时发生变化，应用将拒绝读取。位于 iCloud 的文件必须先下载到本地。
 
-## Running it on another Mac
+## 在另一台 Mac 上运行
 
-The build is signed only for the Mac that built it ("ad-hoc"). Copied to
-another Mac, macOS blocks it the first time: open it once, then allow it in
-**System Settings → Privacy & Security → Open Anyway**. Sharing it widely
-would need a Developer ID signature and notarization.
+构建仅针对构建所在的 Mac 进行临时（ad-hoc）签名。复制到另一台 Mac 后，首次启动会被系统阻止：先尝试打开一次，再前往 **系统设置 → 隐私与安全性 → 仍要打开** 允许启动。广泛分发需使用 Developer ID 签名并进行公证。
 
-On macOS 26 and later the system shows the icon inside the standard rounded
-square, as it does for every icon that isn't drawn in that shape.
+macOS 26 及更新版本会将图标放在标准圆角方形中，这是系统对非圆角方形图标的统一处理。
 
-## License
+## 许可证
 
-MIT, like the rest of the project: see [`LICENSE`](../LICENSE). The build
-copies it into the app (`Contents/Resources/LICENSE.txt`); keep it with the
-app when you share it. Game imagery shown by the editor keeps its own terms.
+与项目其他部分一样采用 MIT 许可证，见 [`LICENSE`](../LICENSE)。构建会将其复制到应用的 `Contents/Resources/LICENSE.txt`；分享应用时请保留。编辑器显示的游戏图像保留其自身许可条款。

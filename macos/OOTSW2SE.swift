@@ -139,7 +139,7 @@ enum BackupReader {
         let slotsFolder = isDirectory(nested) && !slotFolders(in: nested).isEmpty ? nested : folder
         let slots = slotFolders(in: slotsFolder)
         if slots.isEmpty {
-            throw HostError("No folder containing progress.sav and caption.sav was found.")
+            throw HostError("未找到同时包含 progress.sav 和 caption.sav 的文件夹。")
         }
         for (slot, slotFolder) in slots {
             try readPair(into: &files, folder: slotFolder, prefix: prefix + slot + "/", total: &totalBytes)
@@ -212,15 +212,15 @@ enum BackupReader {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
         let values = try target.resourceValues(forKeys: keys)
         guard values.isRegularFile == true else {
-            throw HostError("\(relativePath) is not a regular file.")
+            throw HostError("\(relativePath) 不是常规文件。")
         }
         if isDataless(target) {
-            throw HostError("\(relativePath) is not downloaded yet. Download it in Finder, then try again.")
+            throw HostError("\(relativePath) 尚未下载，请先在访达中下载后重试。")
         }
         let limit = min(HostLimits.maxFileBytes, HostLimits.maxBackupBytes - total)
         let size = values.fileSize ?? 0
         if size > limit {
-            throw HostError("The backup files exceed the expected size.")
+            throw HostError("备份文件超出预期大小。")
         }
         let handle = try FileHandle(forReadingFrom: target)
         defer { try? handle.close() }
@@ -228,12 +228,12 @@ enum BackupReader {
         // size check is rejected without being loaded whole.
         let data = try handle.read(upToCount: limit + 1) ?? Data()
         if data.count > limit {
-            throw HostError("The backup files exceed the expected size.")
+            throw HostError("备份文件超出预期大小。")
         }
         // Same check as Program.cs: fewer bytes than reported means the file
         // shrank or the read stopped early, so the copy would be incomplete.
         if data.count < size {
-            throw HostError("A backup file was truncated while reading it.")
+            throw HostError("读取过程中备份文件被截断。")
         }
         // macOS has no equivalent of the FileShare.Read lock Program.cs relies
         // on to refuse files another program is writing. Compare size and
@@ -242,7 +242,7 @@ enum BackupReader {
         target.removeAllCachedResourceValues()
         let after = try target.resourceValues(forKeys: keys)
         if after.fileSize != values.fileSize || after.contentModificationDate != values.contentModificationDate {
-            throw HostError("\(relativePath) changed while it was being read. Close the game or emulator, then try again.")
+            throw HostError("\(relativePath) 在读取过程中发生变化，请关闭游戏或模拟器后重试。")
         }
         total += data.count
         files.append(["relativePath": relativePath, "contents": data.base64EncodedString()])
@@ -340,13 +340,13 @@ enum PatchFolderWriter {
         let pattern = #"\AOcarina-of-Time-(?:Save|slot_0[0-5])-Patch-([0-9]{8}_[0-9]{6})_[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\z"#
         let regex = try NSRegularExpression(pattern: pattern)
         guard let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)),
-              let range = Range(match.range(at: 1), in: name) else { throw HostError("Invalid patch folder name.") }
+              let range = Range(match.range(at: 1), in: name) else { throw HostError("补丁文件夹名称无效。") }
         return String(name[range])
     }
 
     static func decode(_ entries: [[String: String]]?, name: String) throws -> [String: Data] {
         let stamp = try timestamp(name)
-        guard let entries, (2...4).contains(entries.count) else { throw HostError("Invalid patch file list.") }
+        guard let entries, (2...4).contains(entries.count) else { throw HostError("补丁文件列表无效。") }
         let pattern = #"\A(?:manifest\.json|"# + stamp + #"/(?:progress\.sav|caption\.sav|option\.sav|slot_0[0-5]/(?:progress|caption)\.sav))\z"#
         var files: [String: Data] = [:]
         var total = 0
@@ -355,11 +355,11 @@ enum PatchFolderWriter {
                   files[path] == nil, let contents = entry["contents"], !contents.isEmpty,
                   contents.utf8.count <= HostLimits.maxFileBytes * 2,
                   let bytes = Data(base64Encoded: contents), !bytes.isEmpty else {
-                throw HostError("Invalid patch file.")
+                throw HostError("补丁文件无效。")
             }
             total += bytes.count
             guard bytes.count <= HostLimits.maxFileBytes, total <= HostLimits.maxBackupBytes else {
-                throw HostError("The patch files are too large.")
+                throw HostError("补丁文件过大。")
             }
             files[path] = bytes
         }
@@ -460,7 +460,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
     private func loadEditor() {
         guard let url = Bundle.main.url(forResource: "editor", withExtension: "html"),
               let html = try? String(contentsOf: url, encoding: .utf8) else {
-            showFatal("editor.html is missing from the application bundle.")
+            showFatal("应用程序包中缺少 editor.html。")
             return
         }
         // pageGeneration and the window layout are reset in didCommit, which
@@ -536,7 +536,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
         }
         guard let id = request["id"] as? Int, id >= 1 else { return }
         if dialogOpen {
-            reply(id: id, result: nil, error: "A file dialog is already open.")
+            reply(id: id, result: nil, error: "已有文件对话框处于打开状态。")
             return
         }
         dialogOpen = true
@@ -556,7 +556,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
         case "savePatch":
             savePatch(name: request["name"] as? String, contents: request["contents"] as? String, completion: finish)
         default:
-            finish(nil, HostError("Unknown editor action."))
+            finish(nil, HostError("未知的编辑器操作。"))
         }
     }
 
@@ -574,8 +574,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
     /// Completes with `nil` when the user cancels.
     private func openBackup(completion: @escaping Completion) {
         let panel = NSOpenPanel()
-        panel.message = "Select a backup or save folder"
-        panel.prompt = "Select Folder"
+        panel.message = "选择备份或存档文件夹"
+        panel.prompt = "选择文件夹"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -611,15 +611,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
         // and base64 is ASCII, so both give the same number.
         guard let contents, !contents.isEmpty, contents.utf8.count <= HostLimits.maxBackupBytes * 2,
               let bytes = Data(base64Encoded: contents) else {
-            return completion(nil, HostError("The patch ZIP is empty or too large."))
+            return completion(nil, HostError("ZIP 补丁为空或过大。"))
         }
         // 22 bytes is the smallest valid ZIP (end-of-central-directory record);
         // "PK\u{3}\u{4}" is the local file header signature the editor writes first.
         guard bytes.count >= 22, bytes.count <= HostLimits.maxBackupBytes, bytes.starts(with: [0x50, 0x4B, 0x03, 0x04]) else {
-            return completion(nil, HostError("The editor did not create a valid patch ZIP."))
+            return completion(nil, HostError("编辑器未生成有效的 ZIP 补丁。"))
         }
         let panel = NSSavePanel()
-        panel.title = "Save patch"
+        panel.title = "保存补丁"
         panel.allowedContentTypes = [.zip]
         panel.canCreateDirectories = true
         // Keep only the file-name part of what the page suggests. An empty name
@@ -646,13 +646,13 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
     }
 
     private func saveFolder(entries: [[String: String]]?, name: String?, completion: @escaping Completion) {
-        guard let name else { return completion(nil, HostError("Invalid patch folder name.")) }
+        guard let name else { return completion(nil, HostError("补丁文件夹名称无效。")) }
         let files: [String: Data]
         do { files = try PatchFolderWriter.decode(entries, name: name) }
         catch { return completion(nil, error) }
         let panel = NSOpenPanel()
-        panel.message = "Select where to create the patch folder"
-        panel.prompt = "Export Here"
+        panel.message = "选择创建补丁文件夹的位置"
+        panel.prompt = "导出到此处"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
@@ -721,8 +721,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         if let window {
             let alert = NSAlert()
-            alert.messageText = "The editor stopped unexpectedly."
-            alert.informativeText = "Unsaved edits were lost. Open the backup again to continue."
+            alert.messageText = "编辑器意外停止。"
+            alert.informativeText = "尚未保存的修改已丢失，请重新打开备份以继续。"
             alert.alertStyle = .warning
             alert.beginSheetModal(for: window, completionHandler: nil)
         }
@@ -738,7 +738,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate,
     /// Reports a page that failed to load and closes the window.
     private func showFatal(_ message: String) {
         let alert = NSAlert()
-        alert.messageText = "The editor window could not start."
+        alert.messageText = "无法启动编辑器窗口。"
         alert.informativeText = message
         alert.alertStyle = .critical
         alert.runModal()
@@ -780,42 +780,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let main = NSMenu()
 
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About OOT SW2SE", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "关于 OOT SW2SE", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide OOT SW2SE", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthers = appMenu.addItem(withTitle: "Hide Others",
+        appMenu.addItem(withTitle: "隐藏 OOT SW2SE", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: "隐藏其他应用",
                                          action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
-        appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "全部显示", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit OOT SW2SE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "退出 OOT SW2SE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(submenu: appMenu, title: "OOT SW2SE")
 
-        let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        let editMenu = NSMenu(title: "编辑")
+        editMenu.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
         editMenu.addItem(.separator())
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        main.addItem(submenu: editMenu, title: "Edit")
+        editMenu.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        main.addItem(submenu: editMenu, title: "编辑")
 
         // AppKit retitles this item "Exit Full Screen" while in full screen, and
         // disables it while the landing window is not resizable.
-        let viewMenu = NSMenu(title: "View")
-        let fullScreen = viewMenu.addItem(withTitle: "Enter Full Screen",
+        let viewMenu = NSMenu(title: "显示")
+        let fullScreen = viewMenu.addItem(withTitle: "进入全屏幕",
                                           action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
         fullScreen.keyEquivalentModifierMask = [.command, .control]
-        main.addItem(submenu: viewMenu, title: "View")
+        main.addItem(submenu: viewMenu, title: "显示")
 
-        let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
-        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let windowMenu = NSMenu(title: "窗口")
+        windowMenu.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(withTitle: "关闭", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowMenu.addItem(.separator())
-        windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
-        main.addItem(submenu: windowMenu, title: "Window")
+        windowMenu.addItem(withTitle: "前置全部窗口", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        main.addItem(submenu: windowMenu, title: "窗口")
         NSApp.windowsMenu = windowMenu
 
         return main

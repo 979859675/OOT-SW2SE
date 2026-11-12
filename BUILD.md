@@ -1,35 +1,45 @@
-# Build OOT SW2SE
+# 构建 OOT SW2SE
 
-Use Windows x64 with .NET Framework 4.8 and the Microsoft Edge WebView2 Runtime. From PowerShell in this folder, run:
+## Windows
+
+需要 Windows x64、.NET Framework 4.8 和 Microsoft Edge WebView2 运行时。在此目录中打开 PowerShell 并运行：
 
 ```powershell
 .\build.ps1
 ```
 
-The script verifies the pinned Microsoft WebView2 SDK package, builds the executable, and places it with the project license (`LICENSE.txt`) and the WebView2 license (`WebView2-LICENSE.txt`) in `dist`. The application works offline. The build downloads the SDK once, unless you pass a local copy with `-WebView2Package`.
+脚本验证固定版本的 Microsoft WebView2 SDK 包，编译可执行文件，并将其连同项目许可证（`LICENSE.txt`）和 WebView2 许可证（`WebView2-LICENSE.txt`）放入 `dist`。应用可离线使用。首次构建需下载 SDK，也可通过 `-WebView2Package` 指定本地 SDK 包。
 
-`Program.cs` contains the native window and local file dialogs. `editor.html` contains the English editor interface, save parser, and patch generator.
+`Program.cs` 包含原生窗口和本地文件对话框；`editor.html` 包含简体中文编辑界面、存档解析器和补丁生成器。源文件使用 UTF-8 编码。
 
-The MIT license applies to the original editor software. WebView2 and third-party material, such as game imagery, retain their own terms.
+原始编辑器软件采用 MIT 许可证。WebView2 和游戏图像等第三方内容保留各自的许可条款。
 
 ## macOS
 
-Use macOS 13 or later with the Xcode command-line tools (`xcode-select --install`). From Terminal in this folder, run:
+需要 macOS 13 或更新版本，以及 Xcode 命令行工具（`xcode-select --install`）。在此目录的终端中运行：
 
 ```sh
 macos/build.sh
 ```
 
-The script builds a universal app for Apple silicon and Intel, signs it ad hoc for the Mac that built it, and places it in `macos/dist/OOT SW2SE.app` with the project license inside the app. It bundles the same `editor.html` unchanged and reads the version from `Program.cs`.
+脚本构建同时支持 Apple silicon 和 Intel 的通用应用，为构建所在的 Mac 进行临时签名，并将应用放入 `macos/dist/OOT SW2SE.app`，项目许可证包含在应用内。它直接打包相同的 `editor.html`，版本号读取自 `Program.cs`。
 
-GitHub Actions also runs this script ([`.github/workflows/macos.yml`](.github/workflows/macos.yml)): download the app from a run in the Actions tab, or from a release, where it is attached as `OOT-SW2SE-<version>-macOS.zip`. These builds are ad hoc signed, not notarized, so macOS blocks the first launch until you choose **Open Anyway** in System Settings → Privacy & Security.
+GitHub Actions 也运行此脚本（[`.github/workflows/macos.yml`](.github/workflows/macos.yml)）。可在 Actions 页的构建记录或发行版中下载应用；发行版附件名为 `OOT-SW2SE-<version>-macOS.zip`。这些构建采用临时签名，未经公证，首次启动会被 macOS 阻止；请在“系统设置 → 隐私与安全性”中选择“仍要打开”。
 
-`macos/OOTSW2SE.swift` contains the native window and file dialogs. See [`macos/README.md`](macos/README.md) for usage notes and for running the app on another Mac.
+`macos/OOTSW2SE.swift` 包含原生窗口和文件对话框。使用方法以及在另一台 Mac 上运行的说明见 [macos/README.md](macos/README.md)。
 
-## Checks
+## 检查
 
-Run `node --test tests/editor.test.cjs` for synthetic save regression tests.
-On a Mac with Swift and Mono installed, run `python3 tests/host_exports.py` to
-compile and exercise the actual Swift and C# folder export helpers, including
-path validation and byte-for-byte output checks. These checks do not replace
-in-game testing with a real save.
+运行合成存档回归测试：
+
+```sh
+node --test tests/editor.test.cjs
+```
+
+在安装了 Swift 和 Mono 的 Mac 上，还可运行：
+
+```sh
+python3 tests/host_exports.py
+```
+
+此测试编译并执行实际的 Swift 和 C# 文件夹导出辅助代码，检查路径校验及输出字节是否一致。这些检查不能替代使用真实存档进行游戏内测试。

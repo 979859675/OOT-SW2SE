@@ -94,29 +94,29 @@ test('adding an item still registers acquisition flags', () => {
 
 test('reject flag-only resets, contradictory progress edits, and add/remove conflicts', () => {
   const f = fixture(); const h = item('Item_Boomerang'); const flag = registration(h)[1];
-  assert.throws(() => edit(f, { clearAcquisitions: [h] }), /requires removing/);
-  assert.throws(() => edit(f, { removals: [h], clearAcquisitions: [h], flags: [[flag, true]] }), /conflicts/);
-  assert.throws(() => edit(f, { removals: [h], additions: [h] }), /cannot be added/);
+  assert.throws(() => edit(f, { clearAcquisitions: [h] }), /需要同时移除/);
+  assert.throws(() => edit(f, { removals: [h], clearAcquisitions: [h], flags: [[flag, true]] }), /冲突/);
+  assert.throws(() => edit(f, { removals: [h], additions: [h] }), /无法添加此物品/);
 });
 
 test('reject removal of equipped weapons in either era and default clothes', () => {
   const h = item('Weapon_Sword_Kokiri');
   for (const field of [0xA95A3521, 0xA1F7EE2B]) {
     const f = fixture(['Weapon_Sword_Kokiri']); f.string(field, 'Weapon_Sword_Kokiri');
-    assert.throws(() => edit(f, { removals: [h] }), /Unequip/);
+    assert.throws(() => edit(f, { removals: [h] }), /卸下/);
   }
   const f = fixture(['Armor_Adult_Normal']);
-  assert.throws(() => edit(f, { removals: [item('Armor_Adult_Normal')] }), /supported/);
+  assert.throws(() => edit(f, { removals: [item('Armor_Adult_Normal')] }), /受支持/);
 });
 
 test('reject unsupported stocks, non-boolean acquisition flags and shared flags still in use', () => {
   const f = fixture(); const h = item('Item_Boomerang'); const flag = registration(h)[1];
-  assert.throws(() => edit(f, { removals: [item('Item_Wallet_Small')] }), /supported/);
+  assert.throws(() => edit(f, { removals: [item('Item_Wallet_Small')] }), /受支持/);
   f.set(flag, 2);
-  assert.throws(() => edit(f, { removals: [h], clearAcquisitions: [h] }), /safely/);
+  assert.throws(() => edit(f, { removals: [h], clearAcquisitions: [h] }), /安全修改/);
   const g = fixture(['Item_Boomerang', 'Item_Hammer']); const slot = g.slot();
   const shared = { ...editable, registrations: [...catalog.registrations, [[item('Item_Hammer')], flag, 0, 'Shared test']] };
-  assert.throws(() => api.updateSlot(slot, changes(slot, {removals:[h], clearAcquisitions:[h]}), shared), /shared/);
+  assert.throws(() => api.updateSlot(slot, changes(slot, {removals:[h], clearAcquisitions:[h]}), shared), /共用/);
 });
 
 test('ZIP and folder layout use one UTC timestamp before the UUID and instead of files', async () => {
@@ -146,3 +146,26 @@ test('ZIP and folder layout use one UTC timestamp before the UUID and instead of
 });
 
 module.exports = { fixture };
+
+test('Simplified Chinese UI keeps DOM bindings and internal save identifiers', () => {
+  assert.match(html, /<html lang="zh-CN"/);
+  assert.match(html, /id="folder"[^>]*>打开备份</);
+  assert.match(html, /id="export"[^>]*>保存 ZIP 补丁</);
+  assert.match(html, /id="export-folder"[^>]*>导出到文件夹</);
+  for (const [hash, name, category, , title] of catalog.inventory) {
+    assert.equal(typeof hash, 'number');
+    assert.match(name, /^[A-Za-z][A-Za-z0-9_]+$/);
+    assert.ok(['装备', '关键物品', '物品'].includes(category));
+    assert.ok(title === 'amiibo' || /[\u4e00-\u9fff]/.test(title), name);
+  }
+  assert.equal(catalog.inventory.find(row => row[1] === 'Item_Boomerang')[4], '回旋镖');
+});
+
+test('localized capacity labels never enter the save actor name', () => {
+  for (const [capacity, suffix] of [[30, 'Small'], [40, 'Medium'], [50, 'Large']]) {
+    const f = fixture();
+    const after = edit(f, { upgrades: { seeds: capacity } });
+    assert.equal(after.p.string(0xD732DD7F, 64), 'Item_BulletBag_' + suffix);
+    assert.equal(after.capacities.seeds, capacity);
+  }
+});

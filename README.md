@@ -1,34 +1,53 @@
-# OOT SW2SE
+# OOT SW2SE（简体中文版）
 
-Save editor for the Nintendo Switch 2 remake of The Legend of Zelda: Ocarina of Time.
+用于 Nintendo Switch 2 重制版《塞尔达传说：时之笛》的离线存档编辑器。
 
-Original editor by [Traiver](https://github.com/Traiver/OOT-SW2SE) and upstream contributors.
+原版编辑器由 [Traiver](https://github.com/Traiver/OOT-SW2SE) 及上游贡献者开发。
 
-![OOT SW2SE showing the stats of a loaded save](editor-screenshot.jpg)
+![OOT SW2SE 已加载存档的数值界面（原英文版截图）](editor-screenshot.jpg)
 
-- Edit rupees, hearts, magic & more.
-- Change item quantities, bottles, small keys, and bag or quiver capacity.
-- Add missing items, including masks, with their acquisition flags set automatically.
-- Remove supported owned single items, optionally clearing their mapped acquisition flags. Acquisition history is kept by default; story and quest progress are not reset. Unequip weapons and shields in both eras first. Default clothes, quantities, and capacity upgrades use their own controls rather than inventory removal.
-- Export replacement files as a ZIP or to a new patch folder on Windows and macOS. Export names include a UTC timestamp followed by a UUID; replacement files sit inside a folder named with that same UTC timestamp (`yyyyMMdd_HHmmss`). Exports contain only replacement files, not a complete backup.
-- Toggle progress flags and change the spoken dialogue language when `option.sav` is available.
+## 功能
 
-## Changes in this fork
+- 修改卢比、生命、魔力等数值。
+- 修改物品数量、瓶子、小钥匙，以及袋子和箭袋的容量。
+- 添加未持有的物品（包括面具），并自动设置对应的获取标记。
+- 移除受支持的已持有单件物品，可选清除对应的获取标记。默认保留获取记录，不重置剧情或任务进度。请先在少年和成年两个时期卸下武器及盾牌。默认服装、物品数量和容量升级需使用各自的控件修改，而不是通过物品移除功能修改。
+- 在 Windows 和 macOS 上导出 ZIP 补丁或新的补丁文件夹。导出名称包含 UTC 时间戳和 UUID；替换文件位于同名时间戳文件夹（`yyyyMMdd_HHmmss`）中。导出内容仅包含替换文件，并非完整备份。
+- 切换进度标记；备份包含 `option.sav` 时还可修改对话语音语言。
 
-2026-11-09 · 20:42 (UTC+8)
+## 使用方法
 
-- Added removal of supported owned single items on Windows and macOS.
-- Added an optional acquisition-flag reset when removing an item; acquisition history is preserved by default.
-- Added folder export on both platforms alongside ZIP export, preserving relative paths in a new patch folder.
-- Added regression tests for save editing and both native folder exporters.
-- Built macOS v1.0.1 for Apple silicon and Intel; verified removal, acquisition-flag reset, and folder export through the app with a synthetic save.
+1. 先备份原始存档，关闭游戏或模拟器。
+2. 点击 **打开备份**，选择已解压的备份或包含 `progress.sav` 和 `caption.sav` 的存档文件夹。
+3. 选择存档槽位并编辑。切换槽位会丢弃尚未保存的修改。
+4. 点击 **保存 ZIP 补丁** 或 **导出到文件夹**。
+5. 将时间戳文件夹内的内容复制到完整备份**副本**的 `files/` 目录；如包含 `manifest.json`，将其复制到备份根目录。对于独立存档，将时间戳文件夹内的文件复制到存档文件夹。
 
-2026-11-09 · 13:44 UTC
+汉化涵盖编辑界面、物品名称、原生对话框和提示。为了便于调试并保持存档兼容性，字段名、内部物品 ID、类型名和导出文件路径保留原样。界面汉化不等于为游戏新增中文语音；语音选项仍以游戏支持的语言为准。系统生成的对话框按钮及错误文本取决于操作系统语言。
 
-- Updated ZIP and folder names to include a UTC timestamp before the UUID, for example `Ocarina-of-Time-slot_00-Patch-20261109_094216_<uuid>.zip`.
-- Replaced the exported `files/` directory with `20261109_094216/`, using the same timestamp as the outer name. Loose saves also use a timestamp folder. `manifest.json` stays at the export root.
-- Updated both native folder exporters and built macOS v1.0.2.
+## 本分支更新
 
-To apply a patch to a full backup, copy the contents of the timestamp folder into the backup's `files/` directory and copy `manifest.json` to the backup root when included. For a standalone save, copy the files inside the timestamp folder into the save folder. Work on a copy of the backup.
+### 简体中文汉化
 
-Clearing acquisition flags does not rewind story events or quest progress. Windows UI and in-game behavior have not yet been verified.
+- 汉化界面、104 个物品名称和类别、Windows/macOS 原生提示及 macOS 菜单。
+- 提供中文使用与构建文档，补充汉化和容量升级兼容性回归测试。
+
+### 2026-11-09 · 20:42（UTC+8）
+
+- Windows 和 macOS 新增受支持的已持有单件物品移除功能。
+- 移除物品时可选重置获取标记，默认保留获取记录。
+- 两个平台均新增文件夹导出，保留相对路径并创建新补丁文件夹。
+- 新增存档编辑及两个原生文件夹导出器的回归测试。
+- 构建适用于 Apple silicon 和 Intel 的 macOS v1.0.1，并使用合成存档在应用内验证移除、获取标记重置和文件夹导出功能。
+
+### 2026-11-09 · 13:44 UTC
+
+- ZIP 和文件夹名称在 UUID 前增加 UTC 时间戳，例如 `Ocarina-of-Time-slot_00-Patch-20261109_094216_<uuid>.zip`。
+- 导出中的 `files/` 目录改为与外层名称时间戳一致的 `20261109_094216/`。独立存档同样使用时间戳目录，`manifest.json` 仍位于导出根目录。
+- 更新两个原生文件夹导出器，并构建 macOS v1.0.2。
+
+清除获取标记不会回退剧情或任务进度。Windows 界面及游戏内行为尚未经验证。构建与测试方法见 [BUILD.md](BUILD.md)，macOS 说明见 [macos/README.md](macos/README.md)。
+
+## 许可证
+
+原始编辑器采用 MIT 许可证，见 [LICENSE](LICENSE)。WebView2 和游戏图像等第三方内容保留各自的许可条款；许可证原文保持不变。
