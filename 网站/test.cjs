@@ -35,3 +35,35 @@ test('reject invalid paths, malformed saves, invalid sessions and cross-origin r
  const r=await post('open',{files:files(f)},'',{'X-Site-Password':'test-only-password'});assert.equal(r.status,200);sessions.delete(r.data.token);
  }finally{if(old===undefined)delete process.env.SITE_PASSWORD;else process.env.SITE_PASSWORD=old;}
 });
+
+
+test('connection settings report only whether an access password is required', async () => {
+ const old=process.env.SITE_PASSWORD;
+ try {
+  delete process.env.SITE_PASSWORD;
+  let r=await fetch(base+'/api/config');
+  assert.deepEqual(await r.json(),{service:'oot-sw2se-web',passwordRequired:false});
+  process.env.SITE_PASSWORD='test-config-secret';
+  r=await fetch(base+'/api/config');
+  const text=await r.text();assert.ok(!text.includes('test-config-secret'));
+  assert.deepEqual(JSON.parse(text),{service:'oot-sw2se-web',passwordRequired:true});
+ } finally {if(old===undefined)delete process.env.SITE_PASSWORD;else process.env.SITE_PASSWORD=old;}
+});
+
+test('browser reports HTML/proxy/network failures without exposing raw response text', async () => {
+ const {requestJson}=require('./public/api-client.js');
+ await assert.rejects(()=>requestJson('/api/open',{},async()=>new Response('<html>private upstream page</html>',{status:502,headers:{'Content-Type':'text/html'}})),/接口返回了网页而不是 JSON/);
+ await assert.rejects(()=>requestJson('/api/open',{},async()=>new Response('too large',{status:413})),/上传被代理服务器拒绝/);
+ await assert.rejects(()=>requestJson('/api/open',{},async()=>{throw Error('offline');}),/无法连接后端/);
+ await assert.rejects(()=>requestJson('/api/open',{},async()=>new Response('{',{headers:{'Content-Type':'application/json'}})),/无效的 JSON/);
+ await assert.rejects(()=>requestJson('/api/open',{},async()=>new Response(JSON.stringify({error:'访问密码错误。'}),{status:401,headers:{'Content-Type':'application/json'}})),/访问密码错误/);
+ assert.deepEqual(await requestJson('/api/config',{},async()=>new Response('{"ok":true}',{headers:{'Content-Type':'application/json'}})),{ok:true});
+});
+
+test('browser rejects incomplete manual selection before upload', () => {
+ const {validateFileSelection}=require('./public/api-client.js');
+ assert.throws(()=>validateFileSelection([{path:'Save/caption.sav'}]),/同时选中这两个文件/);
+ assert.throws(()=>validateFileSelection([{path:'a/progress.sav'},{path:'b/caption.sav'}]),/同一存档目录/);
+ assert.doesNotThrow(()=>validateFileSelection([{path:'Save/progress.sav'},{path:'Save/caption.sav'}]));
+ assert.doesNotThrow(()=>validateFileSelection([{path:'Backup/files/slot_00/progress.sav'},{path:'Backup/files/slot_00/caption.sav'}]));
+});

@@ -10,7 +10,7 @@ const rates = new Map();
 const TTL = 15 * 60 * 1000;
 const MAX_BODY = 18 * 1024 * 1024;
 const MAX_TOTAL = 12 * 1024 * 1024;
-const publicFiles = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'] };
+const publicFiles = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/api-client.js': ['api-client.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'] };
 function fail(message, status = 400) { throw Object.assign(new Error(message), { status }); }
 function prune() {
   const now = Date.now();
@@ -59,6 +59,9 @@ const server = http.createServer(async (req,res) => {
     const url = new URL(req.url,'http://local');
     if (req.method === 'GET' && publicFiles[url.pathname]) {
       const [name,type] = publicFiles[url.pathname];res.writeHead(200,{'Content-Type':type});res.end(fs.readFileSync(path.join(__dirname,'public',name)));return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/config') {
+      json({ service: 'oot-sw2se-web', passwordRequired: Boolean(process.env.SITE_PASSWORD) }); return;
     }
     if (!url.pathname.startsWith('/api/')) fail('未找到页面。',404);
     if (req.method !== 'POST') fail('请求方法不支持。',405);

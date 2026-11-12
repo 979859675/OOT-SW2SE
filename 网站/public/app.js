@@ -4,8 +4,7 @@ let token='', state, dirty=false, flagPage=0, fieldPage=0;
 const adds=new Set(), removes=new Set(), clears=new Set(), flags=new Map();
 const el=(tag,text)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 async function api(action,data={}) {
-  const r=await fetch('/api/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':token,'X-Site-Password':$('password').value},body:JSON.stringify(data)});
-  const result=await r.json();if(!r.ok)throw Error(result.error||'请求失败');return result;
+  return WebApi.requestJson('/api/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':token,'X-Site-Password':$('password').value},body:JSON.stringify(data)});
 }
 function message(e){$('status').textContent=e.message;}
 function choices(select,values){select.replaceChildren(...values.map(([v,t])=>new Option(t,v)));}
@@ -51,6 +50,7 @@ async function upload(list){
  $('status').textContent='正在上传并校验，请稍候…';
  try{
  const files=[];for(const file of list){if(!/^(progress\.sav|caption\.sav|option\.sav|manifest\.json)$/.test(file.name))continue;if(file.size>2*1024*1024)throw Error('单文件不能超过 2 MB。');if(files.length>=16)throw Error('文件数量不能超过 16 个。');const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));files.push({path:file.webkitRelativePath||'Save/'+file.name,contents:btoa(binary)});}
+ WebApi.validateFileSelection(files);
  if(token){await api('close');token='';$('workspace').hidden=true;}
  const result=await api('open',{files});token=result.token;state=result;render();$('status').textContent='存档已加载。原始文件不会被覆盖。';
  }catch(e){message(e);}
@@ -69,3 +69,19 @@ $('edit').addEventListener('submit',async e=>{e.preventDefault();const n=id=>Num
  const data=await api('export',{index:state.index,changes,language:state.language===null?null:n('language')});const bytes=Uint8Array.from(atob(data.contents),c=>c.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'application/zip'})),a=document.createElement('a');a.href=url;a.download=data.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);$('result').textContent='已生成补丁并请求浏览器下载。'+data.warning;dirty=false;
  }catch(e){$('result').textContent=e.message;}finally{$('download').disabled=false;}});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+
+async function checkConnection() {
+  try {
+    const config = await WebApi.requestJson('/api/config');
+    if (config.service !== 'oot-sw2se-web' || typeof config.passwordRequired !== 'boolean') throw Error('当前地址不是存档工坊后端，请检查 /api/ 转发配置。');
+    $('password-label').hidden = !config.passwordRequired;
+    $('password').disabled = !config.passwordRequired;
+    $('connection').textContent = config.passwordRequired
+      ? '后端已连接。此网站启用了访问密码，请向网站管理员获取；没有默认密码。'
+      : '后端已连接。本站未启用访问密码，无需填写。';
+  } catch (error) {
+    $('connection').textContent = error.message;
+    $('status').textContent = '后端尚未连通，暂不能读取存档。这不代表存档损坏。';
+  }
+}
+checkConnection();
