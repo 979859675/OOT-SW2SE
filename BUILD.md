@@ -43,3 +43,9 @@ python3 tests/host_exports.py
 ```
 
 此测试编译并执行实际的 Swift 和 C# 文件夹导出辅助代码，检查路径校验及输出字节是否一致。这些检查不能替代使用真实存档进行游戏内测试。
+
+## 下载 Windows 打包成品
+
+推送构建相关文件后，仓库 Actions 页的 **Windows build** 工作流会在 Windows x64 构建机上运行回归测试并执行 `build.ps1`，也可手动触发。
+成功后，在该次运行的 Artifacts 区域下载 `OOT-SW2SE-zh-CN-Windows-x64`，解压得到打包 ZIP，再解压即可获得 `OOT SW2SE.exe` 及两份许可证。
+构建产物保留 30 天，下载需要登录 GitHub。EXE 未进行代码签名，Windows 可能显示安全提示。运行仍需安装 Microsoft Edge WebView2 运行时。

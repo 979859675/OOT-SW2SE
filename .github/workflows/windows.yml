@@ -1,0 +1,55 @@
+name: Windows build
+
+on:
+  push:
+    paths:
+      - "Program.cs"
+      - "editor.html"
+      - "editor.ico"
+      - "app.manifest"
+      - "build.ps1"
+      - "LICENSE"
+      - "WebView2-LICENSE.txt"
+      - "tests/editor.test.cjs"
+      - ".github/workflows/windows.yml"
+  pull_request:
+    paths:
+      - "Program.cs"
+      - "editor.html"
+      - "editor.ico"
+      - "app.manifest"
+      - "build.ps1"
+      - "tests/editor.test.cjs"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run save regression tests
+        run: node --test tests/editor.test.cjs
+      - name: Build Windows x64 executable
+        shell: powershell
+        run: .\build.ps1
+      - name: Package executable and licenses
+        shell: powershell
+        run: |
+          Compress-Archive -Path 'dist\OOT SW2SE.exe', 'dist\LICENSE.txt', 'dist\WebView2-LICENSE.txt' -DestinationPath 'OOT-SW2SE-zh-CN-Windows-x64.zip'
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: OOT-SW2SE-zh-CN-Windows-x64
+          path: OOT-SW2SE-zh-CN-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
