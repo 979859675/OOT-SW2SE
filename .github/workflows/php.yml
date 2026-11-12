@@ -1,0 +1,51 @@
+name: PHP website tests
+on:
+  push:
+    paths:
+      - '网站/**'
+      - 'editor.html'
+      - 'tests/editor.test.cjs'
+      - '.github/workflows/php.yml'
+  pull_request:
+    paths:
+      - '网站/**'
+      - 'editor.html'
+      - 'tests/editor.test.cjs'
+      - '.github/workflows/php.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: Lint PHP sources
+        run: find 网站/PHP版 网站/tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Generate original editor golden vectors
+        run: node 网站/tests/php-golden.cjs
+      - name: Test PHP editor against original save bytes
+        run: php 网站/tests/php-core.php .build/php-vectors.json .build/php-test.zip
+      - name: Test PHP HTTP endpoints
+        run: node 网站/tests/php-http.cjs
+      - name: Package standalone PHP website
+        if: matrix.php == '8.2'
+        run: cd 网站/PHP版 && zip -r ../../.build/OOT-SW2SE-PHP.zip .
+      - uses: actions/upload-artifact@v4
+        if: matrix.php == '8.2'
+        with:
+          name: OOT-SW2SE-PHP
+          path: .build/OOT-SW2SE-PHP.zip
+          if-no-files-found: error
